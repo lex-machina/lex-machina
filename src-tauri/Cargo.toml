@@ -1,0 +1,50 @@
+cargo-features = ["codegen-backend"] # This line needs to come before anything else in Cargo.toml
+                                     # Enables Cranelift as a codegen backend (requires nightly Rust)
+
+[package]
+name = "lex_machina"
+version = "0.1.0"
+description = "TODO: Add description"
+authors = ["sshussh"]
+edition = "2024"
+rust-version = "1.91.0"
+
+[lib]                                           # Library configuration
+name = "lex_machina_lib"                        # Name of the library
+crate-type = ["staticlib", "cdylib", "rlib"]    # Types of libraries to produce
+
+[profile.dev]
+codegen-backend = "cranelift"   # Faster compile times during development (requires nightly Rust)
+split-debuginfo = "unpacked"    # Critical for Linux: keeps debug info in.o files, skipping the linker step
+debug = "line-tables-only"      # fast compile; gives file/line in panics but skips variable inspection
+panic = "abort"                 # Removes unwinding tables, reducing work for Cranelift and Mold
+incremental = true              # Enable incremental compilation for faster rebuilds
+
+[profile.dev.package."*"]   # Optimize development dependencies for speed (compile once, run fast) but strip their debug info to save link time
+debug = false               # Massive link time reduction
+opt-level = 0               # No optimization for fastest compile
+
+[profile.release]      # Release profile for production builds
+opt-level = 3          # Maximum optimization
+lto = "fat"            # Full Link-Time Optimization (cross-crate inlining)
+codegen-units = 1      # Single codegen unit for best optimization
+panic = "abort"        # No unwinding overhead
+strip = "symbols"      # Remove symbols for smaller binary
+
+[profile.release.package."*"]   # Optimize release dependencies for size and speed
+debug = false                   # No debug info for smallest binary
+opt-level = 3                   # Ensure dependencies are fully optimized
+
+[build-dependencies]
+tauri-build = { version = "2.5.1", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.9.2", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+polars = { version = "0.46", features = ["lazy", "csv", "dtype-struct", "fmt", "simd"] }
+parking_lot = "0.12"
+thiserror = "2.0"
