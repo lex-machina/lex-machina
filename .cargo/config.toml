@@ -2,5 +2,5 @@
 linker = "clang"                    # Use Clang as the linker on Linux
 rustflags = [
     "-C", "link-arg=-fuse-ld=/usr/bin/mold",    # Force use of Mold linker
-    "-Z", "threads=8"                           # Enable parallel compilation in the compiler frontend (Nightly only)
+    "-Z", "threads=4"                           # Enable parallel compilation in the compiler frontend (Nightly only)
 ]

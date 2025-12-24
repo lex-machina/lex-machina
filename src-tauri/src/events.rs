@@ -112,7 +112,7 @@ pub struct ErrorPayload {
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```rust,ignore
 /// use crate::events::AppEventEmitter;
 ///
 /// fn some_command(app: AppHandle) {

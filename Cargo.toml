@@ -1,0 +1,55 @@
+cargo-features = ["codegen-backend"] # This line needs to come before anything else in Cargo.toml
+                                     # Enables Cranelift as a codegen backend (requires nightly Rust)
+
+[profile.dev]
+codegen-backend = "cranelift"   # Faster compile times during development (requires nightly Rust)
+split-debuginfo = "unpacked"    # Critical for Linux: keeps debug info in.o files, skipping the linker step
+debug = "line-tables-only"      # fast compile; gives file/line in panics but skips variable inspection
+panic = "abort"                 # Removes unwinding tables, reducing work for Cranelift and Mold
+incremental = true              # Enable incremental compilation for faster rebuilds
+
+[profile.dev.package."*"]   # Optimize development dependencies for speed (compile once, run fast) but strip their debug info to save link time
+debug = false               # Massive link time reduction
+opt-level = 0               # No optimization for fastest compile
+
+[profile.release]      # Release profile for production builds
+opt-level = 3          # Maximum optimization
+lto = "fat"            # Full Link-Time Optimization (cross-crate inlining)
+codegen-units = 1      # Single codegen unit for best optimization
+panic = "abort"        # No unwinding overhead
+strip = "symbols"      # Remove symbols for smaller binary
+
+[profile.release.package."*"]   # Optimize release dependencies for size and speed
+debug = false                   # No debug info for smallest binary
+opt-level = 3                   # Ensure dependencies are fully optimized
+
+
+[workspace]
+resolver = "3"
+members = ["src-tauri", "crates/lex-processing"]
+
+# shared dependencies, ensures version alignment across workspace crates
+[workspace.dependencies]
+polars = { version = "0.51", features = ["lazy", "csv", "dtype-struct", "dtype-full", "fmt", "simd", "parquet", "describe", "strings"] }
+
+# serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# async runtime
+tokio = { version = "1.48", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+
+# data/time
+chrono = { version = "0.4" }
+
+# loggin/tracing
+tracing = "0.1"
+log = "0.4"
+
+# concurrency
+parking_lot = "0.12"

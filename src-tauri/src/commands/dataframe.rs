@@ -189,7 +189,7 @@ fn any_value_to_json(value: AnyValue) -> serde_json::Value {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// // Frontend requests rows 100-149 (50 rows)
 /// get_rows(100, 50, state)
 /// // Returns `RowsResponse { rows: [..50 row...], start: 100, total_rows: 1,000,000 }`

@@ -1,0 +1,7 @@
+/target
+/outputs
+/data
+.env
+cargo.lock
+.cargo
+AGENTS.md

@@ -196,7 +196,7 @@ impl Default for UIState {
 ///
 /// # Usage in Commands
 ///
-/// ```rust
+/// ```rust,ignore
 /// #[tauri::command]
 /// async fn my_command(state: State<'_, AppState>) -> Result<(), String> {
 ///     let df_guard = state.dataframe.read();
