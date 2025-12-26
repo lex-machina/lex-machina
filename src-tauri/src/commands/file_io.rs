@@ -32,7 +32,7 @@ use polars::prelude::*;
 use std::{fs, path::Path};
 use tauri::{AppHandle, State};
 
-use crate::events::{error_codes, AppEventEmitter};
+use crate::events::{AppEventEmitter, error_codes};
 
 use crate::state::{AppState, ColumnInfo, FileInfo, LoadedDataFrame};
 
@@ -313,8 +313,8 @@ pub async fn load_file(
     app.emit_loading(true, Some("Parsing CSV..."));
 
     // Read and parse the CSV file
-    let df = read_csv_file(&path).map_err(|e| {
-        let error_code = match &e {
+    let df = read_csv_file(&path).inspect_err(|e| {
+        let error_code = match e {
             FileError::NotFound(_) => error_codes::FILE_NOT_FOUND,
             FileError::ReadError(_) => error_codes::FILE_READ_ERROR,
             FileError::ParseError(_) => error_codes::FILE_PARSE_ERROR,
@@ -322,7 +322,6 @@ pub async fn load_file(
         };
         app.emit_error(error_code, &e.to_string());
         app.emit_loading(false, None);
-        e
     })?;
 
     // Extract column metadata with auto-calculated widths

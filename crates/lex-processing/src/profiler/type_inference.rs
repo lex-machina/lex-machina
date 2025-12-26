@@ -82,8 +82,21 @@ pub(crate) fn infer_column_type_advanced(
 pub(crate) fn is_numeric_column_advanced(series: &Series, sample_values: &[String]) -> bool {
     let name_suggests_numeric = {
         let indicators = [
-            "quantity", "price", "amount", "cost", "total", "value", "sum", "count", "number",
-            "int", "float", "score", "rating", "percent", "percentage",
+            "quantity",
+            "price",
+            "amount",
+            "cost",
+            "total",
+            "value",
+            "sum",
+            "count",
+            "number",
+            "int",
+            "float",
+            "score",
+            "rating",
+            "percent",
+            "percentage",
         ];
         let lower = series.name().to_lowercase();
         indicators.iter().any(|ind| lower.contains(ind))
@@ -233,7 +246,7 @@ mod tests {
     fn test_infer_type_all_null_returns_unknown() {
         let series = Series::new("col".into(), &[None::<i64>, None, None]);
         let samples = vec![];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "col").unwrap();
         assert_eq!(result, "unknown");
     }
@@ -242,7 +255,7 @@ mod tests {
     fn test_infer_type_boolean_native() {
         let series = Series::new("is_active".into(), &[true, false, true, false]);
         let samples = vec!["true".to_string(), "false".to_string()];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "is_active").unwrap();
         assert_eq!(result, "binary");
     }
@@ -257,7 +270,7 @@ mod tests {
             "no".to_string(),
             "yes".to_string(),
         ];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "flag").unwrap();
         assert_eq!(result, "binary");
     }
@@ -270,7 +283,7 @@ mod tests {
             "2024-02-20".to_string(),
             "2024-03-25".to_string(),
         ];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "date").unwrap();
         assert_eq!(result, "datetime");
     }
@@ -285,7 +298,7 @@ mod tests {
             "2024-01-15T10:30:00".to_string(),
             "2024-02-20T14:45:00".to_string(),
         ];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "timestamp").unwrap();
         assert_eq!(result, "datetime");
     }
@@ -294,7 +307,7 @@ mod tests {
     fn test_infer_type_numeric_native_int() {
         let series = Series::new("count".into(), &[1i64, 2, 3, 4, 5]);
         let samples = vec![];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "count").unwrap();
         assert_eq!(result, "numeric");
     }
@@ -303,7 +316,7 @@ mod tests {
     fn test_infer_type_numeric_native_float() {
         let series = Series::new("price".into(), &[1.5f64, 2.5, 3.5, 4.5, 5.5]);
         let samples = vec![];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "price").unwrap();
         assert_eq!(result, "numeric");
     }
@@ -318,7 +331,7 @@ mod tests {
             "400".to_string(),
             "500".to_string(),
         ];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "amount").unwrap();
         assert_eq!(result, "numeric");
     }
@@ -334,7 +347,7 @@ mod tests {
             ],
         );
         let samples = vec![];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "description").unwrap();
         assert_eq!(result, "text");
     }
@@ -343,7 +356,7 @@ mod tests {
     fn test_infer_type_string_categorical() {
         let series = Series::new("category".into(), &["red", "blue", "green", "red", "blue"]);
         let samples = vec![];
-        
+
         let result = infer_column_type_advanced(&series, &samples, "category").unwrap();
         assert_eq!(result, "string");
     }

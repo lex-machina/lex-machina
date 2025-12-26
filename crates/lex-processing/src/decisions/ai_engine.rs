@@ -32,10 +32,17 @@ pub struct AiDecisionEngine<'a> {
 impl<'a> AiDecisionEngine<'a> {
     /// Create a new AI decision engine with the given provider and config.
     pub fn new(ai_provider: &'a dyn AIProvider, config: PipelineConfig) -> Self {
-        Self { ai_provider, config }
+        Self {
+            ai_provider,
+            config,
+        }
     }
 
-    fn get_sample_data_for_issue(&self, df: &DataFrame, issue: &DataQualityIssue) -> Result<String> {
+    fn get_sample_data_for_issue(
+        &self,
+        df: &DataFrame,
+        issue: &DataQualityIssue,
+    ) -> Result<String> {
         let sample_size = std::cmp::min(5, df.height());
 
         let sample_df = if !issue.affected_columns.is_empty() {
@@ -68,9 +75,10 @@ impl<'a> AiDecisionEngine<'a> {
 
         let valid_problem_types = ["classification", "regression"];
         if let Some(pt) = problem_type
-            && valid_problem_types.contains(&pt.as_str()) {
-                return pt;
-            }
+            && valid_problem_types.contains(&pt.as_str())
+        {
+            return pt;
+        }
 
         warn!("AI chose invalid problem type, defaulting to classification");
         "classification".to_string()
@@ -93,7 +101,7 @@ impl<'a> AiDecisionEngine<'a> {
                 .column_profiles
                 .iter()
                 .any(|col| &col.name == target);
-            
+
             if column_exists {
                 info!("Using explicitly specified target column: {}", target);
                 return Ok(target.clone());
@@ -131,10 +139,7 @@ impl<'a> AiDecisionEngine<'a> {
         let mut options = Vec::new();
 
         for col_name in &all_available_cols {
-            let Some(col_profile) = profile
-                .column_profiles
-                .iter()
-                .find(|c| &c.name == col_name)
+            let Some(col_profile) = profile.column_profiles.iter().find(|c| &c.name == col_name)
             else {
                 continue;
             };
@@ -242,9 +247,7 @@ impl<'a> DecisionEngine for AiDecisionEngine<'a> {
                 sample_data: self.get_sample_data_for_issue(df, issue)?,
             };
 
-            let ai_choice = self
-                .ai_provider
-                .make_preprocessing_decision(&question)?;
+            let ai_choice = self.ai_provider.make_preprocessing_decision(&question)?;
             debug!("AI Decision for {}: {}", issue.issue_type, ai_choice);
             ai_choices.insert(question.id, ai_choice);
         }

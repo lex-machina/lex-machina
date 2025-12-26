@@ -45,7 +45,10 @@ pub fn is_numeric_dtype(dtype: &DataType) -> bool {
 /// Check if a DataType is a datetime type.
 #[inline]
 pub fn is_datetime_dtype(dtype: &DataType) -> bool {
-    matches!(dtype, DataType::Datetime(_, _) | DataType::Date | DataType::Time)
+    matches!(
+        dtype,
+        DataType::Datetime(_, _) | DataType::Date | DataType::Time
+    )
 }
 
 /// Check if a DataType is boolean.
@@ -178,7 +181,8 @@ pub fn string_mode(series: &Series) -> Option<String> {
         Err(_) => return None,
     };
 
-    let mut value_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut value_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     for val in str_chunked.into_iter().flatten() {
         *value_counts.entry(val.to_string()).or_insert(0) += 1;
     }
@@ -284,14 +288,12 @@ pub fn collect_sample_values(series: &Series, max_samples: usize) -> Vec<String>
 // =============================================================================
 
 /// Common boolean true representations.
-pub const BOOLEAN_TRUE_VALUES: [&str; 8] = [
-    "true", "yes", "1", "t", "y", "on", "enabled", "active",
-];
+pub const BOOLEAN_TRUE_VALUES: [&str; 8] =
+    ["true", "yes", "1", "t", "y", "on", "enabled", "active"];
 
 /// Common boolean false representations.
-pub const BOOLEAN_FALSE_VALUES: [&str; 8] = [
-    "false", "no", "0", "f", "n", "off", "disabled", "inactive",
-];
+pub const BOOLEAN_FALSE_VALUES: [&str; 8] =
+    ["false", "no", "0", "f", "n", "off", "disabled", "inactive"];
 
 /// Check if a string represents a boolean true value.
 pub fn is_boolean_true(s: &str) -> bool {
@@ -329,7 +331,10 @@ mod tests {
     #[test]
     fn test_is_datetime_dtype() {
         assert!(is_datetime_dtype(&DataType::Date));
-        assert!(is_datetime_dtype(&DataType::Datetime(TimeUnit::Milliseconds, None)));
+        assert!(is_datetime_dtype(&DataType::Datetime(
+            TimeUnit::Milliseconds,
+            None
+        )));
         assert!(!is_datetime_dtype(&DataType::String));
     }
 
@@ -382,9 +387,15 @@ mod tests {
     #[test]
     fn test_dtype_category() {
         assert_eq!(get_dtype_category(&DataType::Int64), DtypeCategory::Numeric);
-        assert_eq!(get_dtype_category(&DataType::Float64), DtypeCategory::Numeric);
+        assert_eq!(
+            get_dtype_category(&DataType::Float64),
+            DtypeCategory::Numeric
+        );
         assert_eq!(get_dtype_category(&DataType::Date), DtypeCategory::Datetime);
-        assert_eq!(get_dtype_category(&DataType::Boolean), DtypeCategory::Boolean);
+        assert_eq!(
+            get_dtype_category(&DataType::Boolean),
+            DtypeCategory::Boolean
+        );
         assert_eq!(get_dtype_category(&DataType::String), DtypeCategory::String);
     }
 
@@ -392,7 +403,7 @@ mod tests {
     fn test_fill_numeric_nulls() {
         let series = Series::new("test".into(), &[Some(1.0), None, Some(3.0)]);
         let filled = fill_numeric_nulls(&series, 0.0).unwrap();
-        
+
         assert_eq!(filled.get(0).unwrap().try_extract::<f64>().unwrap(), 1.0);
         assert_eq!(filled.get(1).unwrap().try_extract::<f64>().unwrap(), 0.0);
         assert_eq!(filled.get(2).unwrap().try_extract::<f64>().unwrap(), 3.0);

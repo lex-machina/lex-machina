@@ -6,11 +6,11 @@ use lex_processing::{
     CancellationToken, Pipeline, PipelineConfig, PreprocessingError, PreprocessingStage,
     ProgressUpdate,
 };
-use polars::prelude::*;
 use polars::io::csv::read::CsvReadOptions;
+use polars::prelude::*;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ============================================================================
 // Helper Functions

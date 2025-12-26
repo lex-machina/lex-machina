@@ -33,39 +33,40 @@ impl RuleBasedDecisionEngine {
         let col_name = issue.affected_columns.first();
 
         if let Some(col_name) = col_name
-            && let Ok(series) = df.column(col_name) {
-                let is_numeric = matches!(
-                    series.dtype(),
-                    DataType::Int8
-                        | DataType::Int16
-                        | DataType::Int32
-                        | DataType::Int64
-                        | DataType::UInt8
-                        | DataType::UInt16
-                        | DataType::UInt32
-                        | DataType::UInt64
-                        | DataType::Float32
-                        | DataType::Float64
-                );
+            && let Ok(series) = df.column(col_name)
+        {
+            let is_numeric = matches!(
+                series.dtype(),
+                DataType::Int8
+                    | DataType::Int16
+                    | DataType::Int32
+                    | DataType::Int64
+                    | DataType::UInt8
+                    | DataType::UInt16
+                    | DataType::UInt32
+                    | DataType::UInt64
+                    | DataType::Float32
+                    | DataType::Float64
+            );
 
-                if is_numeric {
-                    // For numeric columns
-                    if missing_pct < 5.0 {
-                        return "median_imputation".to_string();
-                    } else if missing_pct < 20.0 {
-                        return "knn_imputation".to_string();
-                    } else {
-                        return "median_imputation".to_string();
-                    }
+            if is_numeric {
+                // For numeric columns
+                if missing_pct < 5.0 {
+                    return "median_imputation".to_string();
+                } else if missing_pct < 20.0 {
+                    return "knn_imputation".to_string();
                 } else {
-                    // For categorical columns
-                    if missing_pct < 10.0 {
-                        return "mode_imputation".to_string();
-                    } else {
-                        return "constant_imputation".to_string();
-                    }
+                    return "median_imputation".to_string();
+                }
+            } else {
+                // For categorical columns
+                if missing_pct < 10.0 {
+                    return "mode_imputation".to_string();
+                } else {
+                    return "constant_imputation".to_string();
                 }
             }
+        }
 
         // Default fallback
         "median_imputation".to_string()
@@ -100,7 +101,7 @@ impl RuleBasedDecisionEngine {
                 .column_profiles
                 .iter()
                 .any(|col| &col.name == target);
-            
+
             if column_exists {
                 info!("Using explicitly specified target column: {}", target);
                 return target.clone();
@@ -137,17 +138,18 @@ impl RuleBasedDecisionEngine {
                 && let Some(col) = candidates
                     .iter()
                     .find(|c| c.inferred_type == "numeric" && c.unique_count > 10)
-                {
-                    return col.name.clone();
-                }
+            {
+                return col.name.clone();
+            }
             return candidates[0].name.clone();
         }
 
         // Priority 2: Last column (common convention)
         if let Some(last_col) = profile.column_profiles.last()
-            && !["identifier", "metadata"].contains(&last_col.inferred_role.as_str()) {
-                return last_col.name.clone();
-            }
+            && !["identifier", "metadata"].contains(&last_col.inferred_role.as_str())
+        {
+            return last_col.name.clone();
+        }
 
         // Fallback: first non-identifier column
         profile
@@ -405,7 +407,9 @@ mod tests {
     #[test]
     fn test_problem_type_default_classification() {
         let engine = RuleBasedDecisionEngine::new(PipelineConfig::default());
-        let profile = create_profile(vec![create_column_profile("feature", "numeric", "feature", 50)]);
+        let profile = create_profile(vec![create_column_profile(
+            "feature", "numeric", "feature", 50,
+        )]);
 
         let problem_type = engine.determine_problem_type(&profile);
         assert_eq!(problem_type, "classification");
@@ -534,7 +538,9 @@ mod tests {
             "regression".to_string(),
         );
 
-        let (problem_type, target) = engine.finalize_problem_setup(&profile, &choices, &df).unwrap();
+        let (problem_type, target) = engine
+            .finalize_problem_setup(&profile, &choices, &df)
+            .unwrap();
 
         // Should use the choice from HashMap
         assert_eq!(problem_type, "regression");
@@ -553,7 +559,9 @@ mod tests {
         let df = df!["survived" => [0, 1, 0, 1]].unwrap();
         let choices = HashMap::new();
 
-        let (problem_type, target) = engine.finalize_problem_setup(&profile, &choices, &df).unwrap();
+        let (problem_type, target) = engine
+            .finalize_problem_setup(&profile, &choices, &df)
+            .unwrap();
 
         assert_eq!(problem_type, "classification");
         assert_eq!(target, "survived");

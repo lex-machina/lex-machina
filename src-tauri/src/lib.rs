@@ -19,11 +19,15 @@
 //! |  ---------------  ---------------  |  - get_rows             |  |
 //! |                                    |  - close_file           |  |
 //! |                                    |  - UI state commands    |  |
+//! |                                    |  - Preprocessing cmds   |  |
+//! |                                    |  - Settings commands    |  |
 //! |                                    ---------------------------  |
 //! |                                                                 |
 //! |  -----------------------------------------------------------    |
 //! |  |                    Events (Rust → Frontend)              |    |
 //! |  |  file:loaded, file:closed, app:loading, app:error        |    |
+//! |  |  preprocessing:progress, preprocessing:complete          |    |
+//! |  |  preprocessing:error, settings:theme-changed             |    |
 //! |  -----------------------------------------------------------    |
 //! |                                                                 |
 //! |  -----------------------------------------------------------    |
@@ -40,6 +44,8 @@
 //! - **File I/O**: Loading/reading CSV files
 //! - **DataFrame**: Row fetching for virtual scroll, closing files
 //! - **UI State**: Persisting layout preferences
+//! - **Preprocessing**: Data cleaning pipeline operations
+//! - **Settings**: Theme and AI provider configuration
 //!
 //! # Event System
 //!
@@ -48,6 +54,11 @@
 //! - `file:closed` - File closed
 //! - `app:loading` - Loading state changed
 //! - `app:error` - Error occurred
+//! - `preprocessing:progress` - Pipeline progress update
+//! - `preprocessing:complete` - Pipeline finished successfully
+//! - `preprocessing:error` - Pipeline failed
+//! - `preprocessing:cancelled` - Pipeline cancelled by user
+//! - `settings:theme-changed` - Theme setting changed
 
 mod commands;
 pub mod events;
@@ -108,6 +119,38 @@ pub fn run() {
             commands::get_grid_scroll,
             // Updates scroll position (debounced from frontend)
             commands::set_grid_scroll,
+            // Preprocessing commands
+            // Starts the preprocessing pipeline on the loaded DataFrame
+            commands::start_preprocessing,
+            // Cancels the currently running preprocessing pipeline
+            commands::cancel_preprocessing,
+            // Gets the preprocessing history
+            commands::get_preprocessing_history,
+            // Loads a history entry (currently returns error - not fully implemented)
+            commands::load_history_entry,
+            // Clears all preprocessing history
+            commands::clear_preprocessing_history,
+            // Gets file info for the processed DataFrame
+            commands::get_processed_file_info,
+            // Fetches rows from the processed DataFrame for virtual scrolling
+            commands::get_processed_rows,
+            // Clears the processed DataFrame from memory
+            commands::clear_processed_data,
+            // Exports processed data to CSV with JSON report
+            commands::export_processed_data,
+            // Settings commands
+            // Gets the current theme setting
+            commands::get_theme,
+            // Sets the application theme
+            commands::set_theme,
+            // Gets the current AI provider configuration
+            commands::get_ai_provider_config,
+            // Configures an AI provider for preprocessing decisions
+            commands::configure_ai_provider,
+            // Clears the AI provider configuration
+            commands::clear_ai_provider,
+            // Validates an AI provider API key
+            commands::validate_ai_api_key,
         ])
         // ====================================================================
         // SETUP HOOK

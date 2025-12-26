@@ -3,12 +3,14 @@
 //! This module serves as the central hub for all Tauri IPC commands.
 //! Commands are organized into logical groups:
 //!
-//! # Module Organizatioin
+//! # Module Organization
 //!
 //! - **dialog**: Native OS file dialogs (open file picker)
 //! - **file_io**: File loading and metadata extraction (CSV parsing with Polars)
 //! - **dataframe**: Data Operations (row fetching for virtual scroll, closing files)
 //! - **ui**: UI state management (sidebar width, column widths)
+//! - **preprocessing**: Data preprocessing pipeline operations
+//! - **settings**: App settings (theme, AI provider configuration)
 //!
 //! # How Commands Work
 //!
@@ -24,10 +26,14 @@
 pub mod dataframe;
 pub mod dialog;
 pub mod file_io;
+pub mod preprocessing;
+pub mod settings;
 pub mod ui;
 
 // Re-export all commands for easy access in lib.rs
 pub use dataframe::*;
 pub use dialog::*;
 pub use file_io::*;
+pub use preprocessing::*;
+pub use settings::*;
 pub use ui::*;

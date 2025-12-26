@@ -95,6 +95,47 @@ const MLIcon = () => (
   </svg>
 );
 
+const ProcessingIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 3v3" />
+    <path d="M18.5 5.5l-2.1 2.1" />
+    <path d="M21 12h-3" />
+    <path d="M18.5 18.5l-2.1-2.1" />
+    <path d="M12 21v-3" />
+    <path d="M5.5 18.5l2.1-2.1" />
+    <path d="M3 12h3" />
+    <path d="M5.5 5.5l2.1 2.1" />
+    <circle cx="12" cy="12" r="4" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
 /**
  * Navigation configuration.
  * Add new pages here as the app grows.
@@ -114,6 +155,13 @@ const NAV_ITEMS: NavItem[] = [
     requiresFile: false, // Data page available to import files
   },
   {
+    id: "processing",
+    label: "Processing",
+    href: "/processing",
+    icon: <ProcessingIcon />,
+    requiresFile: true,
+  },
+  {
     id: "analysis",
     label: "Analysis",
     href: "/analysis",
@@ -126,6 +174,19 @@ const NAV_ITEMS: NavItem[] = [
     href: "/ml",
     icon: <MLIcon />,
     requiresFile: true,
+  },
+];
+
+/**
+ * Bottom navigation items (settings, etc.)
+ * These are shown at the bottom of the sidebar, separated from main nav.
+ */
+const BOTTOM_NAV_ITEMS: NavItem[] = [
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/settings",
+    icon: <SettingsIcon />,
   },
 ];
 
@@ -149,6 +210,67 @@ const NAV_WIDTH = 56;
  * </div>
  * ```
  */
+/**
+ * Renders a single navigation item.
+ */
+function NavItemButton({
+  item,
+  isActive,
+  isDisabled,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  isDisabled: boolean;
+}) {
+  return (
+    <div className="relative group">
+      {isDisabled ? (
+        // Disabled state - not clickable
+        <div
+          className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-lg my-1",
+            "text-muted-foreground/40 cursor-not-allowed"
+          )}
+          title={`${item.label} (requires file)`}
+        >
+          {item.icon}
+        </div>
+      ) : (
+        // Active/normal state - clickable link
+        <Link
+          href={item.href}
+          className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-lg my-1",
+            "transition-colors duration-150",
+            isActive
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+          title={item.label}
+        >
+          {item.icon}
+        </Link>
+      )}
+
+      {/* Tooltip - appears on hover */}
+      <div
+        className={cn(
+          "absolute left-full ml-2 px-2 py-1 rounded text-xs font-medium",
+          "bg-popover text-popover-foreground shadow-md border",
+          "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+          "pointer-events-none whitespace-nowrap z-50"
+        )}
+        style={{ top: "50%", transform: "translateY(-50%)" }}
+      >
+        {item.label}
+        {isDisabled && (
+          <span className="text-muted-foreground ml-1">(no file)</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const NavSidebar = () => {
   const pathname = usePathname();
   const { isFileLoaded } = useFileState();
@@ -158,58 +280,45 @@ const NavSidebar = () => {
       className="shrink-0 flex flex-col items-center py-2 border-r bg-background"
       style={{ width: NAV_WIDTH }}
     >
-      {NAV_ITEMS.map((item) => {
-        const isActive = pathname === item.href;
-        const isDisabled = item.requiresFile && !isFileLoaded;
+      {/* Main navigation items */}
+      <div className="flex flex-col items-center">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href;
+          const isDisabled = item.requiresFile === true && !isFileLoaded;
 
-        return (
-          <div key={item.id} className="relative group">
-            {isDisabled ? (
-              // Disabled state - not clickable
-              <div
-                className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-lg my-1",
-                  "text-muted-foreground/40 cursor-not-allowed"
-                )}
-                title={`${item.label} (requires file)`}
-              >
-                {item.icon}
-              </div>
-            ) : (
-              // Active/normal state - clickable link
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-lg my-1",
-                  "transition-colors duration-150",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                title={item.label}
-              >
-                {item.icon}
-              </Link>
-            )}
+          return (
+            <NavItemButton
+              key={item.id}
+              item={item}
+              isActive={isActive}
+              isDisabled={isDisabled}
+            />
+          );
+        })}
+      </div>
 
-            {/* Tooltip - appears on hover */}
-            <div
-              className={cn(
-                "absolute left-full ml-2 px-2 py-1 rounded text-xs font-medium",
-                "bg-popover text-popover-foreground shadow-md border",
-                "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-                "pointer-events-none whitespace-nowrap z-50"
-              )}
-              style={{ top: "50%", transform: "translateY(-50%)" }}
-            >
-              {item.label}
-              {isDisabled && (
-                <span className="text-muted-foreground ml-1">(no file)</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Separator */}
+      <div className="w-8 h-px bg-border my-2" />
+
+      {/* Bottom navigation items (Settings) */}
+      <div className="flex flex-col items-center">
+        {BOTTOM_NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href;
+          const isDisabled = item.requiresFile === true && !isFileLoaded;
+
+          return (
+            <NavItemButton
+              key={item.id}
+              item={item}
+              isActive={isActive}
+              isDisabled={isDisabled}
+            />
+          );
+        })}
+      </div>
     </nav>
   );
 };

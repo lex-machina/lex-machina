@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Rust build artifacts - not part of our codebase
+    "target/**",
+    "src-tauri/target/**",
+    "crates/**/target/**",
   ]),
 ]);
 

@@ -125,8 +125,18 @@ export function useGridData(): GridDataState {
   }, [fileInfo]);
 
   // Reset state when file changes/closes
+  // Using a ref to track the previous fileInfo state to avoid the lint warning
+  // about setState in effects. This is necessary because we need to clear
+  // UI state when the file is closed.
+  const prevFileInfoRef = useRef(fileInfo);
   useEffect(() => {
-    if (!fileInfo) {
+    const wasLoaded = prevFileInfoRef.current !== null;
+    const isLoaded = fileInfo !== null;
+    prevFileInfoRef.current = fileInfo;
+
+    // Only reset if we transitioned from loaded to unloaded
+    if (wasLoaded && !isLoaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Necessary to reset state when file closes
       setRows([]);
       setVisibleStart(0);
       setColumnWidths([]);

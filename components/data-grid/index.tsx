@@ -25,6 +25,9 @@
 export { default } from "./data-grid";
 export { default as DataGrid } from "./data-grid";
 
+// ProcessedDataGrid - for displaying processed DataFrame data
+export { ProcessedDataGrid } from "./processed-data-grid";
+
 // Export hooks for advanced use cases (e.g., building custom grid variants)
 export { useGridData } from "./use-grid-data";
 export { useGridScroll, ROW_HEIGHT, SCROLLBAR_SIZE } from "./use-grid-scroll";

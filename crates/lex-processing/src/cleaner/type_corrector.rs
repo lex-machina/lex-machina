@@ -53,7 +53,8 @@ impl TypeCorrector {
                     }
                     Err(e) => {
                         warn!("Failed to correct column '{}': {}", profile.name, e);
-                        correction_steps.push(format!("Failed to correct '{}': {}", profile.name, e));
+                        correction_steps
+                            .push(format!("Failed to correct '{}': {}", profile.name, e));
                     }
                 }
             }
@@ -430,18 +431,17 @@ mod tests {
     #[test]
     fn test_correct_column_types_numeric_to_int() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "id" => [1, 2, 3],
             "value" => ["10", "20", "30"],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("value", "numeric", "feature"),
-        ];
+        let profiles = vec![create_test_profile("value", "numeric", "feature")];
 
         let (result_df, steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         // Should have converted string to numeric
         let value_col = result_df.column("value").unwrap();
         assert!(is_numeric_dtype(value_col.dtype()) || value_col.dtype() == &DataType::String);
@@ -451,17 +451,16 @@ mod tests {
     #[test]
     fn test_correct_column_types_numeric_to_float() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "price" => ["10.5", "20.3", "30.7"],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("price", "numeric", "feature"),
-        ];
+        let profiles = vec![create_test_profile("price", "numeric", "feature")];
 
         let (result_df, _steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         let price_col = result_df.column("price").unwrap();
         // Should be float since values have decimals
         assert!(is_numeric_dtype(price_col.dtype()) || price_col.dtype() == &DataType::String);
@@ -470,17 +469,16 @@ mod tests {
     #[test]
     fn test_correct_column_types_skips_identifiers() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "user_id" => ["001", "002", "003"],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("user_id", "numeric", "identifier"),
-        ];
+        let profiles = vec![create_test_profile("user_id", "numeric", "identifier")];
 
         let (result_df, _steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         // Should NOT convert identifier columns
         let user_id_col = result_df.column("user_id").unwrap();
         assert_eq!(user_id_col.dtype(), &DataType::String);
@@ -489,17 +487,16 @@ mod tests {
     #[test]
     fn test_correct_column_types_with_nulls() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => [Some("10"), None, Some("30")],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("value", "numeric", "feature"),
-        ];
+        let profiles = vec![create_test_profile("value", "numeric", "feature")];
 
         let (result_df, _steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         // Nulls should be preserved
         let value_col = result_df.column("value").unwrap();
         assert!(value_col.null_count() >= 1);
@@ -508,36 +505,36 @@ mod tests {
     #[test]
     fn test_correct_column_types_binary_to_boolean() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "active" => ["true", "false", "true"],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("active", "binary", "feature"),
-        ];
+        let profiles = vec![create_test_profile("active", "binary", "feature")];
 
         let (result_df, _steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         let active_col = result_df.column("active").unwrap();
         // Should be converted to boolean or kept as string
-        assert!(active_col.dtype() == &DataType::Boolean || active_col.dtype() == &DataType::String);
+        assert!(
+            active_col.dtype() == &DataType::Boolean || active_col.dtype() == &DataType::String
+        );
     }
 
     #[test]
     fn test_correct_column_types_keeps_categorical_as_string() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "category" => ["A", "B", "C", "A"],
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("category", "categorical", "feature"),
-        ];
+        let profiles = vec![create_test_profile("category", "categorical", "feature")];
 
         let (result_df, _steps) = corrector.correct_column_types(df, &profiles).unwrap();
-        
+
         // Categorical stays as string (no conversion)
         let cat_col = result_df.column("category").unwrap();
         assert_eq!(cat_col.dtype(), &DataType::String);
@@ -550,14 +547,15 @@ mod tests {
     #[test]
     fn test_collect_fresh_samples_basic() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "col1" => ["a", "b", "c"],
             "col2" => [1, 2, 3],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let samples = corrector.collect_fresh_samples(&df).unwrap();
-        
+
         assert!(samples.contains_key("col1"));
         assert!(samples.contains_key("col2"));
         assert_eq!(samples.get("col1").unwrap().len(), 3);
@@ -566,13 +564,14 @@ mod tests {
     #[test]
     fn test_collect_fresh_samples_with_nulls() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "col" => [Some("a"), None, Some("c")],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let samples = corrector.collect_fresh_samples(&df).unwrap();
-        
+
         // Should only include non-null samples
         let col_samples = samples.get("col").unwrap();
         assert_eq!(col_samples.len(), 2);
@@ -581,14 +580,15 @@ mod tests {
     #[test]
     fn test_collect_fresh_samples_max_10() {
         let corrector = TypeCorrector;
-        
+
         let values: Vec<i32> = (0..100).collect();
         let df = df![
             "col" => values,
-        ].unwrap();
+        ]
+        .unwrap();
 
         let samples = corrector.collect_fresh_samples(&df).unwrap();
-        
+
         // Should cap at 10 samples
         let col_samples = samples.get("col").unwrap();
         assert_eq!(col_samples.len(), 10);
@@ -597,13 +597,14 @@ mod tests {
     #[test]
     fn test_collect_fresh_samples_all_nulls() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "col" => [Option::<&str>::None, None, None],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let samples = corrector.collect_fresh_samples(&df).unwrap();
-        
+
         // Should not have entry for all-null column
         assert!(!samples.contains_key("col"));
     }
@@ -615,83 +616,97 @@ mod tests {
     #[test]
     fn test_determine_target_type_numeric_integer() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => ["10", "20", "30"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("value", "numeric", "feature");
         let mut samples = HashMap::new();
-        samples.insert("value".to_string(), vec!["10".to_string(), "20".to_string(), "30".to_string()]);
+        samples.insert(
+            "value".to_string(),
+            vec!["10".to_string(), "20".to_string(), "30".to_string()],
+        );
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         // Should suggest Int32 for small integers
-        assert!(matches!(target, Some(DataType::Int32) | Some(DataType::Int64)));
+        assert!(matches!(
+            target,
+            Some(DataType::Int32) | Some(DataType::Int64)
+        ));
     }
 
     #[test]
     fn test_determine_target_type_numeric_float() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => ["10.5", "20.3", "30.7"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("value", "numeric", "feature");
         let mut samples = HashMap::new();
-        samples.insert("value".to_string(), vec!["10.5".to_string(), "20.3".to_string(), "30.7".to_string()]);
+        samples.insert(
+            "value".to_string(),
+            vec!["10.5".to_string(), "20.3".to_string(), "30.7".to_string()],
+        );
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         assert_eq!(target, Some(DataType::Float64));
     }
 
     #[test]
     fn test_determine_target_type_datetime() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "date" => ["2024-01-15", "2024-02-20"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("date", "datetime", "metadata");
         let samples = HashMap::new();
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         assert!(matches!(target, Some(DataType::Datetime(_, _))));
     }
 
     #[test]
     fn test_determine_target_type_binary() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "flag" => ["true", "false"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("flag", "binary", "feature");
         let samples = HashMap::new();
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         assert_eq!(target, Some(DataType::Boolean));
     }
 
     #[test]
     fn test_determine_target_type_skips_identifier() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "id" => ["001", "002", "003"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("id", "numeric", "identifier");
         let samples = HashMap::new();
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         // Should return None for identifiers
         assert_eq!(target, None);
     }
@@ -699,16 +714,17 @@ mod tests {
     #[test]
     fn test_determine_target_type_categorical() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "category" => ["A", "B", "C"],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("category", "categorical", "feature");
         let samples = HashMap::new();
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         // Categorical returns None (keep as string)
         assert_eq!(target, None);
     }
@@ -716,16 +732,17 @@ mod tests {
     #[test]
     fn test_determine_target_type_all_nulls() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => [Option::<&str>::None, None],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let profile = create_test_profile("value", "numeric", "feature");
         let samples = HashMap::new();
 
         let target = corrector.determine_target_type_with_samples(&profile, &df, &samples);
-        
+
         // Should return None for all-null columns
         assert_eq!(target, None);
     }
@@ -737,10 +754,10 @@ mod tests {
     #[test]
     fn test_get_numeric_range_basic() {
         let corrector = TypeCorrector;
-        
+
         let series = Series::new("values".into(), &[1.0, 5.0, 10.0, 3.0]);
         let (min, max) = corrector.get_numeric_range(&series).unwrap();
-        
+
         assert_eq!(min, 1.0);
         assert_eq!(max, 10.0);
     }
@@ -748,10 +765,10 @@ mod tests {
     #[test]
     fn test_get_numeric_range_negative() {
         let corrector = TypeCorrector;
-        
+
         let series = Series::new("values".into(), &[-100.0, -50.0, 0.0, 50.0]);
         let (min, max) = corrector.get_numeric_range(&series).unwrap();
-        
+
         assert_eq!(min, -100.0);
         assert_eq!(max, 50.0);
     }
@@ -759,10 +776,10 @@ mod tests {
     #[test]
     fn test_get_numeric_range_single_value() {
         let corrector = TypeCorrector;
-        
+
         let series = Series::new("values".into(), &[42.0]);
         let (min, max) = corrector.get_numeric_range(&series).unwrap();
-        
+
         assert_eq!(min, 42.0);
         assert_eq!(max, 42.0);
     }
@@ -774,17 +791,16 @@ mod tests {
     #[test]
     fn test_detect_mismatches_numeric() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => ["10", "20", "30"],  // String but should be numeric
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("value", "numeric", "feature"),
-        ];
+        let profiles = vec![create_test_profile("value", "numeric", "feature")];
 
         let mismatches = corrector.detect_mismatches(&df, &profiles).unwrap();
-        
+
         assert_eq!(mismatches.len(), 1);
         assert!(mismatches[0].contains("value"));
         assert!(mismatches[0].contains("numeric"));
@@ -793,34 +809,32 @@ mod tests {
     #[test]
     fn test_detect_mismatches_no_mismatch() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "value" => [10.0, 20.0, 30.0],  // Already numeric
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("value", "numeric", "feature"),
-        ];
+        let profiles = vec![create_test_profile("value", "numeric", "feature")];
 
         let mismatches = corrector.detect_mismatches(&df, &profiles).unwrap();
-        
+
         assert!(mismatches.is_empty());
     }
 
     #[test]
     fn test_detect_mismatches_datetime() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "date" => ["2024-01-15", "2024-02-20"],  // String but should be datetime
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("date", "datetime", "metadata"),
-        ];
+        let profiles = vec![create_test_profile("date", "datetime", "metadata")];
 
         let mismatches = corrector.detect_mismatches(&df, &profiles).unwrap();
-        
+
         assert_eq!(mismatches.len(), 1);
         assert!(mismatches[0].contains("datetime"));
     }
@@ -828,17 +842,16 @@ mod tests {
     #[test]
     fn test_detect_mismatches_binary() {
         let corrector = TypeCorrector;
-        
+
         let df = df![
             "flag" => ["true", "false"],  // String but should be boolean
-        ].unwrap();
+        ]
+        .unwrap();
 
-        let profiles = vec![
-            create_test_profile("flag", "binary", "feature"),
-        ];
+        let profiles = vec![create_test_profile("flag", "binary", "feature")];
 
         let mismatches = corrector.detect_mismatches(&df, &profiles).unwrap();
-        
+
         assert_eq!(mismatches.len(), 1);
         assert!(mismatches[0].contains("binary"));
     }

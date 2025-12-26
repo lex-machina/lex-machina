@@ -21,6 +21,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 parking_lot.workspace = true
 log.workspace = true
+chrono.workspace = true
 
 # tauri-specific
 tauri = { version = "2.9.2", features = [] }

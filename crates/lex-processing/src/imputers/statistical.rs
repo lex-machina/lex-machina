@@ -22,12 +22,12 @@ impl StatisticalImputer {
             if let Some(median_val) = series.median() {
                 let series_clone = series.clone();
                 Self::fill_with_value(
-                    df, 
-                    col_name, 
-                    median_val, 
-                    &series_clone, 
-                    processing_steps, 
-                    "median"
+                    df,
+                    col_name,
+                    median_val,
+                    &series_clone,
+                    processing_steps,
+                    "median",
                 )?;
             }
         }
@@ -45,12 +45,12 @@ impl StatisticalImputer {
             if let Some(mean_val) = series.mean() {
                 let series_clone = series.clone();
                 Self::fill_with_value(
-                    df, 
-                    col_name, 
-                    mean_val, 
-                    &series_clone, 
-                    processing_steps, 
-                    "mean"
+                    df,
+                    col_name,
+                    mean_val,
+                    &series_clone,
+                    processing_steps,
+                    "mean",
                 )?;
             }
         }
@@ -64,20 +64,17 @@ impl StatisticalImputer {
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
         let col = &col_profile.name;
-        
+
         if let Ok(column) = df.column(col) {
             let series = column.as_materialized_series();
             if let Some(mode_val) = string_mode(series) {
                 let filled = fill_string_nulls(series, &mode_val)?;
                 df.replace(col, filled)?;
-                
-                processing_steps.push(format!(
-                    "Filled '{}' with mode: '{}'",
-                    col, mode_val
-                ));
+
+                processing_steps.push(format!("Filled '{}' with mode: '{}'", col, mode_val));
             }
         }
-        
+
         Ok(())
     }
 
@@ -88,18 +85,15 @@ impl StatisticalImputer {
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
         let col = &col_profile.name;
-        
+
         if let Ok(column) = df.column(col) {
             let series = column.as_materialized_series();
             let filled = fill_string_nulls(series, "Missing")?;
             df.replace(col, filled)?;
-            
-            processing_steps.push(format!(
-                "Added 'Missing' category indicator to '{}'",
-                col
-            ));
+
+            processing_steps.push(format!("Added 'Missing' category indicator to '{}'", col));
         }
-        
+
         Ok(())
     }
 
@@ -110,18 +104,15 @@ impl StatisticalImputer {
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
         let col = &col_profile.name;
-        
+
         if let Ok(column) = df.column(col) {
             let series = column.as_materialized_series();
             let filled = fill_string_nulls(series, "Unknown")?;
             df.replace(col, filled)?;
-            
-            processing_steps.push(format!(
-                "Filled '{}' with constant value: 'Unknown'",
-                col
-            ));
+
+            processing_steps.push(format!("Filled '{}' with constant value: 'Unknown'", col));
         }
-        
+
         Ok(())
     }
 
@@ -132,7 +123,7 @@ impl StatisticalImputer {
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
         let col = &col_profile.name;
-        
+
         match col_profile.inferred_type.as_str() {
             "numeric" => {
                 // Get median value and clone series to break borrow
@@ -140,12 +131,21 @@ impl StatisticalImputer {
                     let series = column.as_materialized_series();
                     (series.median(), series.clone())
                 } else {
-                    (None, Series::new_empty(PlSmallStr::EMPTY, &DataType::Float64))
+                    (
+                        None,
+                        Series::new_empty(PlSmallStr::EMPTY, &DataType::Float64),
+                    )
                 };
-                
+
                 if let Some(median_val) = median_val {
-                    Self::fill_with_value(df, col, median_val, &series_clone, 
-                                         processing_steps, "median (fallback)")?;
+                    Self::fill_with_value(
+                        df,
+                        col,
+                        median_val,
+                        &series_clone,
+                        processing_steps,
+                        "median (fallback)",
+                    )?;
                 }
             }
             "categorical" | "binary" => {
@@ -157,11 +157,8 @@ impl StatisticalImputer {
                     let filled = series.fill_null(FillNullStrategy::Forward(None))?;
                     let filled = filled.fill_null(FillNullStrategy::Backward(None))?;
                     df.replace(col, filled)?;
-                    
-                    processing_steps.push(format!(
-                        "Forward fill '{}' (fallback)",
-                        col
-                    ));
+
+                    processing_steps.push(format!("Forward fill '{}' (fallback)", col));
                 }
             }
             _ => {
@@ -169,15 +166,12 @@ impl StatisticalImputer {
                     let series = column.as_materialized_series();
                     let filled = fill_string_nulls(series, "Unknown")?;
                     df.replace(col, filled)?;
-                    
-                    processing_steps.push(format!(
-                        "Filled '{}' with 'Unknown' (fallback)",
-                        col
-                    ));
+
+                    processing_steps.push(format!("Filled '{}' with 'Unknown' (fallback)", col));
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -192,7 +186,7 @@ impl StatisticalImputer {
     ) -> Result<()> {
         let mask = series.is_null();
         let mut result_vec = Vec::with_capacity(series.len());
-        
+
         for i in 0..series.len() {
             if mask.get(i).unwrap_or(false) {
                 result_vec.push(Some(fill_value));
@@ -201,15 +195,15 @@ impl StatisticalImputer {
                 result_vec.push(Some(val.try_extract::<f64>()?));
             }
         }
-        
+
         let result = Series::new(col_name.into(), result_vec);
         df.replace(col_name, result)?;
-        
+
         processing_steps.push(format!(
             "Filled '{}' with {}: {:.2}",
             col_name, method, fill_value
         ));
-        
+
         Ok(())
     }
 }
@@ -240,20 +234,21 @@ mod tests {
     fn test_apply_numeric_median_basic() {
         let mut df = df![
             "values" => [Some(1.0), None, Some(3.0), None, Some(5.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_median(&mut df, "values", &mut steps).unwrap();
 
         let values = df.column("values").unwrap();
         assert_eq!(values.null_count(), 0);
-        
+
         // Median of [1, 3, 5] = 3
         let imputed_1 = values.get(1).unwrap().try_extract::<f64>().unwrap();
         let imputed_3 = values.get(3).unwrap().try_extract::<f64>().unwrap();
         assert_eq!(imputed_1, 3.0);
         assert_eq!(imputed_3, 3.0);
-        
+
         assert!(steps[0].contains("median"));
     }
 
@@ -261,7 +256,8 @@ mod tests {
     fn test_apply_numeric_median_no_nulls() {
         let mut df = df![
             "values" => [1.0, 2.0, 3.0],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_median(&mut df, "values", &mut steps).unwrap();
@@ -277,7 +273,8 @@ mod tests {
     fn test_apply_numeric_median_single_value() {
         let mut df = df![
             "values" => [Some(42.0), None, None],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_median(&mut df, "values", &mut steps).unwrap();
@@ -292,12 +289,13 @@ mod tests {
     fn test_apply_numeric_median_all_nulls() {
         let mut df = df![
             "values" => [Option::<f64>::None, None, None],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         // Should not panic, but no imputation happens since median is None
         StatisticalImputer::apply_numeric_median(&mut df, "values", &mut steps).unwrap();
-        
+
         // Steps should be empty since median couldn't be calculated
         assert!(steps.is_empty());
     }
@@ -306,7 +304,8 @@ mod tests {
     fn test_apply_numeric_median_nonexistent_column() {
         let mut df = df![
             "other" => [1.0, 2.0, 3.0],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         // Should not panic for non-existent column
@@ -322,7 +321,8 @@ mod tests {
     fn test_apply_numeric_mean_basic() {
         let mut df = df![
             "values" => [Some(1.0), None, Some(5.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_mean(&mut df, "values", &mut steps).unwrap();
@@ -331,7 +331,7 @@ mod tests {
         let values = df.column("values").unwrap();
         assert_eq!(values.null_count(), 0);
         assert_eq!(values.get(1).unwrap().try_extract::<f64>().unwrap(), 3.0);
-        
+
         assert!(steps[0].contains("mean"));
     }
 
@@ -339,7 +339,8 @@ mod tests {
     fn test_apply_numeric_mean_preserves_original_values() {
         let mut df = df![
             "values" => [Some(10.0), None, Some(20.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_mean(&mut df, "values", &mut steps).unwrap();
@@ -360,7 +361,8 @@ mod tests {
     fn test_apply_mode_imputation_basic() {
         let mut df = df![
             "category" => [Some("A"), Some("B"), Some("A"), None, Some("A")],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -370,7 +372,7 @@ mod tests {
         assert_eq!(category.null_count(), 0);
         // Mode is "A" (appears 3 times)
         assert_eq!(category.get(3).unwrap().to_string(), "\"A\"");
-        
+
         assert!(steps[0].contains("mode"));
     }
 
@@ -378,7 +380,8 @@ mod tests {
     fn test_apply_mode_imputation_tie_breaking() {
         let mut df = df![
             "category" => [Some("A"), Some("B"), None],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -393,7 +396,8 @@ mod tests {
     fn test_apply_mode_imputation_all_unique() {
         let mut df = df![
             "category" => [Some("A"), Some("B"), Some("C"), None],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -412,7 +416,8 @@ mod tests {
     fn test_apply_category_indicator_basic() {
         let mut df = df![
             "category" => [Some("A"), None, Some("B")],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -421,7 +426,7 @@ mod tests {
         let category = df.column("category").unwrap();
         assert_eq!(category.null_count(), 0);
         assert_eq!(category.get(1).unwrap().to_string(), "\"Missing\"");
-        
+
         assert!(steps[0].contains("Missing"));
     }
 
@@ -429,7 +434,8 @@ mod tests {
     fn test_apply_category_indicator_multiple_nulls() {
         let mut df = df![
             "category" => [None, Some("A"), None, None],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -437,7 +443,7 @@ mod tests {
 
         let category = df.column("category").unwrap();
         assert_eq!(category.null_count(), 0);
-        
+
         // Check that nulls are filled with "Missing" and non-nulls preserved
         // Use contains to avoid quoting issues
         assert!(category.get(0).unwrap().to_string().contains("Missing"));
@@ -454,7 +460,8 @@ mod tests {
     fn test_apply_constant_imputation_basic() {
         let mut df = df![
             "text" => [Some("Hello"), None, Some("World")],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("text", "text");
         let mut steps = Vec::new();
 
@@ -463,7 +470,7 @@ mod tests {
         let text = df.column("text").unwrap();
         assert_eq!(text.null_count(), 0);
         assert_eq!(text.get(1).unwrap().to_string(), "\"Unknown\"");
-        
+
         assert!(steps[0].contains("Unknown"));
     }
 
@@ -475,7 +482,8 @@ mod tests {
     fn test_apply_fallback_imputation_numeric() {
         let mut df = df![
             "values" => [Some(1.0), None, Some(5.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("values", "numeric");
         let mut steps = Vec::new();
 
@@ -485,7 +493,7 @@ mod tests {
         assert_eq!(values.null_count(), 0);
         // Median of [1, 5] = 3
         assert_eq!(values.get(1).unwrap().try_extract::<f64>().unwrap(), 3.0);
-        
+
         assert!(steps[0].contains("fallback"));
     }
 
@@ -493,7 +501,8 @@ mod tests {
     fn test_apply_fallback_imputation_categorical() {
         let mut df = df![
             "category" => [Some("A"), Some("A"), None],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("category", "categorical");
         let mut steps = Vec::new();
 
@@ -509,7 +518,8 @@ mod tests {
     fn test_apply_fallback_imputation_binary() {
         let mut df = df![
             "flag" => [Some("yes"), Some("yes"), Some("no"), None],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("flag", "binary");
         let mut steps = Vec::new();
 
@@ -525,7 +535,8 @@ mod tests {
     fn test_apply_fallback_imputation_unknown_type() {
         let mut df = df![
             "unknown" => [Some("data"), None, Some("more")],
-        ].unwrap();
+        ]
+        .unwrap();
         let col_profile = create_test_column_profile("unknown", "weird_type");
         let mut steps = Vec::new();
 
@@ -535,7 +546,7 @@ mod tests {
         assert_eq!(unknown.null_count(), 0);
         // Falls back to "Unknown"
         assert_eq!(unknown.get(1).unwrap().to_string(), "\"Unknown\"");
-        
+
         assert!(steps[0].contains("fallback"));
     }
 
@@ -547,7 +558,8 @@ mod tests {
     fn test_fill_with_value_logs_correct_step() {
         let mut df = df![
             "values" => [Some(1.0), None, Some(3.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_median(&mut df, "values", &mut steps).unwrap();
@@ -562,7 +574,8 @@ mod tests {
     fn test_fill_with_value_preserves_type() {
         let mut df = df![
             "values" => [Some(10.0), None, Some(20.0)],
-        ].unwrap();
+        ]
+        .unwrap();
         let mut steps = Vec::new();
 
         StatisticalImputer::apply_numeric_mean(&mut df, "values", &mut steps).unwrap();

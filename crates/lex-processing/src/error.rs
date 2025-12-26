@@ -6,8 +6,8 @@
 //! Errors are serializable for Tauri IPC compatibility, allowing them to be
 //! sent to the frontend for display.
 
-use serde::ser::SerializeStruct;
 use serde::Serialize;
+use serde::ser::SerializeStruct;
 use thiserror::Error;
 
 /// The main error type for the preprocessing pipeline.
@@ -214,8 +214,8 @@ mod tests {
 
     #[test]
     fn test_with_context() {
-        let error = PreprocessingError::ColumnNotFound("test".to_string())
-            .with_context("During profiling");
+        let error =
+            PreprocessingError::ColumnNotFound("test".to_string()).with_context("During profiling");
         assert!(error.to_string().contains("During profiling"));
         assert_eq!(error.error_code(), "COLUMN_NOT_FOUND"); // Preserves original code
     }

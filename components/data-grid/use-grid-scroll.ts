@@ -176,12 +176,22 @@ export function useGridScroll(config: GridScrollConfig): GridScrollState {
   }, [totalRows, maxRowIndex]);
 
   // Reset scroll position when file changes (totalRows goes to 0 then back up)
+  // Using a ref to track the previous state to avoid the lint warning
+  // about setState in effects. This is necessary because we need to reset
+  // scroll state when the file is closed or when currentRowIndex exceeds max.
+  const prevTotalRowsRef = useRef(totalRows);
   useEffect(() => {
-    if (totalRows === 0) {
+    const wasTotalRows = prevTotalRowsRef.current;
+    prevTotalRowsRef.current = totalRows;
+
+    // Reset if totalRows went to 0
+    if (wasTotalRows > 0 && totalRows === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Necessary to reset scroll when file closes
       setCurrentRowIndex(0);
       setScrollLeft(0);
       initializedRef.current = false; // Allow restore on next file
-    } else if (currentRowIndex > maxRowIndex) {
+    } else if (totalRows > 0 && currentRowIndex > maxRowIndex) {
+      // Clamp currentRowIndex if it exceeds the new max
       setCurrentRowIndex(maxRowIndex);
     }
   }, [totalRows, maxRowIndex, currentRowIndex]);

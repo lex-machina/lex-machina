@@ -29,7 +29,11 @@ impl PreprocessingExecutor {
 
         // 1. Handle data type conversions FIRST
         info!("Step 4.1: Handling data type conversions...");
-        let col_names: Vec<String> = df.get_column_names().iter().map(|s| s.to_string()).collect();
+        let col_names: Vec<String> = df
+            .get_column_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         for col_profile in &profile.column_profiles {
             if col_profile.dtype == "String"
                 && col_profile.inferred_type == "numeric"
@@ -73,12 +77,19 @@ impl PreprocessingExecutor {
 
         // 4. Prepare final datasets
         info!("Step 4.4: Preparing final datasets...");
-        let (df_for_training, df_with_identifiers) = self.prepare_final_datasets(df, profile, &mut processing_steps)?;
+        let (df_for_training, df_with_identifiers) =
+            self.prepare_final_datasets(df, profile, &mut processing_steps)?;
 
         info!("Comprehensive preprocessing completed successfully");
-        info!("Training dataset shape: {:?}", (df_for_training.height(), df_for_training.width()));
-        info!("Dataset with IDs shape: {:?}", (df_with_identifiers.height(), df_with_identifiers.width()));
-        
+        info!(
+            "Training dataset shape: {:?}",
+            (df_for_training.height(), df_for_training.width())
+        );
+        info!(
+            "Dataset with IDs shape: {:?}",
+            (df_with_identifiers.height(), df_with_identifiers.width())
+        );
+
         let remaining_nulls: usize = df_for_training
             .get_columns()
             .iter()
@@ -97,7 +108,11 @@ impl PreprocessingExecutor {
         ai_choices: &HashMap<String, String>,
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
-        let col_names_for_missing: Vec<String> = df.get_column_names().iter().map(|s| s.to_string()).collect();
+        let col_names_for_missing: Vec<String> = df
+            .get_column_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let columns_with_missing: Vec<_> = profile
             .column_profiles
             .iter()
@@ -117,7 +132,7 @@ impl PreprocessingExecutor {
             let col_name = &col_profile.name;
             let missing_count = col_profile.null_count;
             let missing_pct = col_profile.null_percentage;
-            
+
             // Get ACTUAL dtype from DataFrame
             let actual_dtype = if let Ok(column) = df.column(col_name) {
                 let series = column.as_materialized_series();
@@ -125,16 +140,24 @@ impl PreprocessingExecutor {
             } else {
                 "string"
             };
-            
-            debug!("Processing '{}' ({} - {:.1}% missing)...", 
-                    col_name, actual_dtype, missing_pct);
+
+            debug!(
+                "Processing '{}' ({} - {:.1}% missing)...",
+                col_name, actual_dtype, missing_pct
+            );
 
             let strategy = Self::get_column_strategy(col_name, ai_choices);
             debug!("Strategy for '{}': {}", col_name, strategy);
 
             match actual_dtype {
                 "numeric" => {
-                    self.handle_numeric_missing(df, col_name, missing_count, &strategy, processing_steps)?;
+                    self.handle_numeric_missing(
+                        df,
+                        col_name,
+                        missing_count,
+                        &strategy,
+                        processing_steps,
+                    )?;
                 }
                 "string" => {
                     self.handle_string_missing(df, col_profile, &strategy, processing_steps)?;
@@ -144,24 +167,24 @@ impl PreprocessingExecutor {
                 }
                 _ => {
                     debug!("Using automatic fallback strategy for '{}'", col_name);
-                    StatisticalImputer::apply_fallback_imputation(df, col_profile, processing_steps)?;
+                    StatisticalImputer::apply_fallback_imputation(
+                        df,
+                        col_profile,
+                        processing_steps,
+                    )?;
                 }
             }
         }
 
         // Verify no missing values remain
-        let remaining_missing: usize = df
-            .get_columns()
-            .iter()
-            .map(|col| col.null_count())
-            .sum();
-        
+        let remaining_missing: usize = df.get_columns().iter().map(|col| col.null_count()).sum();
+
         if remaining_missing > 0 {
             warn!(
                 "{} missing values still remain, applying final cleanup...",
                 remaining_missing
             );
-            
+
             Self::final_missing_value_cleanup(df, processing_steps)?;
         } else {
             info!("All missing values handled successfully");
@@ -183,10 +206,10 @@ impl PreprocessingExecutor {
             "knn_imputation" => {
                 let k_neighbors = (df.height() as f64).sqrt().floor() as usize;
                 let k = k_neighbors.clamp(1, 10).min(df.height() / 2);
-                
+
                 let imputer = KNNImputer::new(k);
                 let col_names = vec![col_name.to_string()];
-                
+
                 match imputer.fit_transform(df, &col_names) {
                     Ok(imputed_df) => {
                         if let Ok(imputed_col) = imputed_df.column(col_name) {
@@ -230,7 +253,7 @@ impl PreprocessingExecutor {
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
         let col_name = &col_profile.name;
-        
+
         match strategy {
             "category_indicator" => {
                 StatisticalImputer::apply_category_indicator(df, col_profile, processing_steps)?;
@@ -261,7 +284,7 @@ impl PreprocessingExecutor {
             let series = column.as_materialized_series();
             let filled = series.fill_null(FillNullStrategy::Forward(None))?;
             let filled = filled.fill_null(FillNullStrategy::Backward(None))?;
-            
+
             if let Err(e) = df.replace(col_name, filled) {
                 warn!("Failed to fill datetime '{}': {}", col_name, e);
             } else {
@@ -283,7 +306,7 @@ impl PreprocessingExecutor {
                 return choice.clone();
             }
         }
-        
+
         // Default to median for numeric (will be overridden by actual dtype check)
         "median_imputation".to_string()
     }
@@ -293,25 +316,27 @@ impl PreprocessingExecutor {
         df: &mut DataFrame,
         processing_steps: &mut Vec<String>,
     ) -> Result<()> {
-        let column_names: Vec<String> = df.get_column_names()
+        let column_names: Vec<String> = df
+            .get_column_names()
             .into_iter()
             .map(|s| s.to_string())
             .collect();
-        
+
         for col_name in column_names {
             if let Ok(column) = df.column(&col_name)
-                && column.null_count() > 0 {
-                    let series = column.as_materialized_series();
-                    let filled = if is_numeric_dtype(series.dtype()) {
-                        fill_numeric_nulls(series, 0.0)?
-                    } else {
-                        fill_string_nulls(series, "Unknown")?
-                    };
-                    
-                    df.replace(&col_name, filled)?;
-                }
+                && column.null_count() > 0
+            {
+                let series = column.as_materialized_series();
+                let filled = if is_numeric_dtype(series.dtype()) {
+                    fill_numeric_nulls(series, 0.0)?
+                } else {
+                    fill_string_nulls(series, "Unknown")?
+                };
+
+                df.replace(&col_name, filled)?;
+            }
         }
-        
+
         processing_steps.push("Final cleanup: filled all remaining missing values".to_string());
         Ok(())
     }

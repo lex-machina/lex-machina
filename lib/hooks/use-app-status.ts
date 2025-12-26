@@ -88,6 +88,9 @@ export function useAppStatus(options?: {
     setLoadingMessage(payload.message);
   }, []);
 
+  // Extract the auto-clear value to satisfy React Compiler's dependency inference
+  const autoClearErrorMs = options?.autoClearErrorMs;
+
   // Handle error event
   const handleError = useCallback(
     (payload: ErrorPayload) => {
@@ -99,17 +102,17 @@ export function useAppStatus(options?: {
       setError(appError);
 
       // Auto-clear error if configured
-      if (options?.autoClearErrorMs) {
+      if (autoClearErrorMs) {
         // Clear any existing timeout
         if (errorTimeoutRef.current) {
           clearTimeout(errorTimeoutRef.current);
         }
         errorTimeoutRef.current = setTimeout(() => {
           setError(null);
-        }, options.autoClearErrorMs);
+        }, autoClearErrorMs);
       }
     },
-    [options?.autoClearErrorMs]
+    [autoClearErrorMs]
   );
 
   // Clear error manually

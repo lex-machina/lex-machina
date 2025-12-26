@@ -122,6 +122,11 @@ pub struct PipelineConfig {
     /// If None, the pipeline will auto-detect the target column.
     /// Default: None
     pub target_column: Option<String>,
+
+    /// Whether to save processed data and reports to disk.
+    /// When false, results are kept in memory only (useful for GUI apps).
+    /// Default: true
+    pub save_to_disk: bool,
 }
 
 impl Default for PipelineConfig {
@@ -140,6 +145,7 @@ impl Default for PipelineConfig {
             generate_reports: true,
             use_ai_decisions: true,
             target_column: None,
+            save_to_disk: true,
         }
     }
 }
@@ -175,7 +181,9 @@ impl PipelineConfig {
         }
 
         if self.knn_neighbors == 0 {
-            return Err(ConfigValidationError::InvalidKnnNeighbors(self.knn_neighbors));
+            return Err(ConfigValidationError::InvalidKnnNeighbors(
+                self.knn_neighbors,
+            ));
         }
 
         Ok(())
@@ -208,6 +216,7 @@ pub struct PipelineConfigBuilder {
     generate_reports: Option<bool>,
     use_ai_decisions: Option<bool>,
     target_column: Option<String>,
+    save_to_disk: Option<bool>,
 }
 
 impl PipelineConfigBuilder {
@@ -307,6 +316,16 @@ impl PipelineConfigBuilder {
         self
     }
 
+    /// Enable or disable saving processed data to disk.
+    ///
+    /// When false, the pipeline keeps results in memory only and skips
+    /// all file I/O. Useful for GUI applications that manage their own
+    /// export functionality.
+    pub fn save_to_disk(mut self, save: bool) -> Self {
+        self.save_to_disk = Some(save);
+        self
+    }
+
     /// Build the configuration.
     ///
     /// Returns a validated `PipelineConfig` or an error if validation fails.
@@ -325,6 +344,7 @@ impl PipelineConfigBuilder {
             generate_reports: self.generate_reports.unwrap_or(true),
             use_ai_decisions: self.use_ai_decisions.unwrap_or(true),
             target_column: self.target_column,
+            save_to_disk: self.save_to_disk.unwrap_or(true),
         };
 
         config.validate()?;
@@ -401,8 +421,11 @@ mod tests {
         let config = PipelineConfig::default();
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: PipelineConfig = serde_json::from_str(&json).unwrap();
-        
-        assert_eq!(config.missing_column_threshold, deserialized.missing_column_threshold);
+
+        assert_eq!(
+            config.missing_column_threshold,
+            deserialized.missing_column_threshold
+        );
         assert_eq!(config.outlier_strategy, deserialized.outlier_strategy);
     }
 
@@ -422,16 +445,21 @@ mod tests {
             "output_name": "my_dataset",
             "generate_reports": false,
             "use_ai_decisions": false,
-            "target_column": "label"
+            "target_column": "label",
+            "save_to_disk": false
         }"#;
 
-        let config: PipelineConfig = serde_json::from_str(json).expect("Should deserialize from frontend JSON");
+        let config: PipelineConfig =
+            serde_json::from_str(json).expect("Should deserialize from frontend JSON");
 
         assert_eq!(config.missing_column_threshold, 0.5);
         assert_eq!(config.missing_row_threshold, 0.6);
         assert_eq!(config.outlier_strategy, OutlierStrategy::Remove);
         assert_eq!(config.default_numeric_imputation, NumericImputation::Knn);
-        assert_eq!(config.default_categorical_imputation, CategoricalImputation::Constant);
+        assert_eq!(
+            config.default_categorical_imputation,
+            CategoricalImputation::Constant
+        );
         assert!(!config.enable_type_correction);
         assert!(config.remove_duplicates);
         assert_eq!(config.knn_neighbors, 7);

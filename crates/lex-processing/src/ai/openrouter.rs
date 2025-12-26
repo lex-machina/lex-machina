@@ -8,7 +8,7 @@
 
 use super::AIProvider;
 use crate::types::DecisionQuestion;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -135,7 +135,9 @@ impl OpenRouterConfigBuilder {
             temperature: self.temperature.unwrap_or(DEFAULT_TEMPERATURE),
             max_tokens: self.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS),
             timeout_secs: self.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS),
-            base_url: self.base_url.unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
+            base_url: self
+                .base_url
+                .unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
         }
     }
 }
@@ -261,7 +263,7 @@ impl OpenRouterProvider {
         }
 
         let result: OpenRouterResponse = response.json()?;
-        
+
         // Extract content from the first choice's message
         // Handle optional fields gracefully
         let text = result
@@ -271,7 +273,7 @@ impl OpenRouterProvider {
             .and_then(|choice| choice.message.as_ref())
             .map(|msg| msg.content.clone())
             .ok_or_else(|| anyhow!("No response content from OpenRouter API"))?;
-        
+
         Ok(text)
     }
 
@@ -475,7 +477,10 @@ mod tests {
         let choices = response.choices.unwrap();
         assert_eq!(choices.len(), 1);
         assert!(choices[0].message.is_some());
-        assert_eq!(choices[0].message.as_ref().unwrap().content, "classification");
+        assert_eq!(
+            choices[0].message.as_ref().unwrap().content,
+            "classification"
+        );
     }
 
     #[test]
@@ -523,7 +528,9 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("classification", &question).unwrap();
+        let result = provider
+            .extract_decision("classification", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -532,10 +539,14 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("CLASSIFICATION", &question).unwrap();
+        let result = provider
+            .extract_decision("CLASSIFICATION", &question)
+            .unwrap();
         assert_eq!(result, "classification");
 
-        let result = provider.extract_decision("Classification", &question).unwrap();
+        let result = provider
+            .extract_decision("Classification", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -544,7 +555,9 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("[classification]", &question).unwrap();
+        let result = provider
+            .extract_decision("[classification]", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -553,10 +566,14 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("\"classification\"", &question).unwrap();
+        let result = provider
+            .extract_decision("\"classification\"", &question)
+            .unwrap();
         assert_eq!(result, "classification");
 
-        let result = provider.extract_decision("'regression'", &question).unwrap();
+        let result = provider
+            .extract_decision("'regression'", &question)
+            .unwrap();
         assert_eq!(result, "regression");
     }
 
@@ -565,7 +582,9 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("  classification  ", &question).unwrap();
+        let result = provider
+            .extract_decision("  classification  ", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -731,9 +750,7 @@ mod tests {
         let provider = OpenRouterProvider::new("test-key").unwrap();
         assert_eq!(provider.model(), Some(DEFAULT_MODEL));
 
-        let config = OpenRouterConfig::builder()
-            .model("custom-model")
-            .build();
+        let config = OpenRouterConfig::builder().model("custom-model").build();
         let provider = OpenRouterProvider::with_config("test-key", config).unwrap();
         assert_eq!(provider.model(), Some("custom-model"));
     }

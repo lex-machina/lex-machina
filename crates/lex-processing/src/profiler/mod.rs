@@ -43,8 +43,9 @@ impl DataProfiler {
         }
 
         // Detect duplicates
-        let duplicate_count =
-            df.height() - df.unique::<&str, &str>(None, UniqueKeepStrategy::First, None)?.height();
+        let duplicate_count = df.height()
+            - df.unique::<&str, &str>(None, UniqueKeepStrategy::First, None)?
+                .height();
         let duplicate_percentage = if df.height() > 0 {
             (duplicate_count as f64 / df.height() as f64) * 100.0
         } else {
@@ -108,8 +109,7 @@ impl DataProfiler {
         );
 
         // Extract characteristics
-        let characteristics =
-            extract_column_characteristics(series, &inferred_type, unique_count)?;
+        let characteristics = extract_column_characteristics(series, &inferred_type, unique_count)?;
 
         Ok(ColumnProfile {
             name: col_name.to_string(),
@@ -221,7 +221,10 @@ impl DataProfiler {
 
         let missing_data_complexity = if avg_null_pct > 20.0 { "high" } else { "low" };
 
-        complexity.insert("size_category".to_string(), serde_json::json!(size_category));
+        complexity.insert(
+            "size_category".to_string(),
+            serde_json::json!(size_category),
+        );
         complexity.insert("feature_count".to_string(), serde_json::json!(n_features));
         complexity.insert(
             "feature_complexity".to_string(),

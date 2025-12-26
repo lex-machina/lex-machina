@@ -128,3 +128,17 @@ body {
     /*-ms-user-select: none; /* Internet Explorer/Edge */
     user-select: none; /* Standard syntax */
 }
+
+/* Progress bar indeterminate animation */
+@keyframes progress-indeterminate {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(400%);
+    }
+}
+
+.animate-progress-indeterminate {
+    animation: progress-indeterminate 1.5s ease-in-out infinite;
+}

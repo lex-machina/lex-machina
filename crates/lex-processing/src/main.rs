@@ -1,12 +1,12 @@
 //! CLI entry point for the data preprocessing pipeline.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{Parser, ValueEnum};
+use dotenv::dotenv;
 use lex_processing::{
     CategoricalImputation, ComprehensiveReport, NumericImputation, OutlierStrategy, Pipeline,
     PipelineConfig, ReportGenerator,
 };
-use dotenv::dotenv;
 use polars::io::csv::read::CsvReadOptions;
 use polars::prelude::*;
 use std::path::Path;
@@ -285,9 +285,11 @@ fn main() -> Result<()> {
 /// Unlike logging (`info!`, `debug!`), this output should always be visible
 /// regardless of log level settings since it's the primary purpose of --dry-run.
 fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
-    use lex_processing::{DataQualityAnalyzer, RuleBasedDecisionEngine, TypeCorrector, PipelineConfig};
-    use lex_processing::profiler::DataProfiler;
     use lex_processing::decisions::DecisionEngine;
+    use lex_processing::profiler::DataProfiler;
+    use lex_processing::{
+        DataQualityAnalyzer, PipelineConfig, RuleBasedDecisionEngine, TypeCorrector,
+    };
 
     println!("\n{}", "=".repeat(80));
     println!("DRY RUN - Preview of preprocessing actions");
@@ -339,14 +341,23 @@ fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
         .collect();
 
     if high_missing_cols.is_empty() {
-        println!("  No columns exceed {:.0}% missing threshold", args.missing_col_threshold * 100.0);
+        println!(
+            "  No columns exceed {:.0}% missing threshold",
+            args.missing_col_threshold * 100.0
+        );
     } else {
-        println!("  Will drop columns with >{:.0}% missing: {:?}", 
-                 args.missing_col_threshold * 100.0, high_missing_cols);
+        println!(
+            "  Will drop columns with >{:.0}% missing: {:?}",
+            args.missing_col_threshold * 100.0,
+            high_missing_cols
+        );
     }
 
     // Check for duplicates
-    let duplicate_count = data.height() - data.unique::<&str, &str>(None, UniqueKeepStrategy::First, None)?.height();
+    let duplicate_count = data.height()
+        - data
+            .unique::<&str, &str>(None, UniqueKeepStrategy::First, None)?
+            .height();
     if duplicate_count > 0 {
         println!("  Will remove {} duplicate rows", duplicate_count);
     } else {
@@ -378,8 +389,9 @@ fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
 
     let issues = DataQualityAnalyzer::identify_issues(&profile, data)?;
 
-    let display_issues: Vec<_> = issues.iter()
-        .filter(|i| i.issue_type != "problem_type_selection")  // Skip meta-issue
+    let display_issues: Vec<_> = issues
+        .iter()
+        .filter(|i| i.issue_type != "problem_type_selection") // Skip meta-issue
         .collect();
 
     if display_issues.is_empty() {
@@ -400,7 +412,7 @@ fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
         // Validate the specified target exists
         if data.column(target).is_ok() {
             println!("  Target column: {} (user-specified)", target);
-            
+
             // Determine problem type based on target
             let target_series = data.column(target)?;
             let unique_count = target_series.n_unique()?;
@@ -413,14 +425,18 @@ fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
             };
             println!("  Problem type: {} (estimated)", problem_type);
         } else {
-            println!("  WARNING: Specified target '{}' not found in dataset!", target);
+            println!(
+                "  WARNING: Specified target '{}' not found in dataset!",
+                target
+            );
             println!("  Available columns: {:?}", data.get_column_names());
         }
     } else {
         // Use rule engine to suggest target
         let config = PipelineConfig::default();
         let rule_engine = RuleBasedDecisionEngine::new(config);
-        match rule_engine.finalize_problem_setup(&profile, &std::collections::HashMap::new(), data) {
+        match rule_engine.finalize_problem_setup(&profile, &std::collections::HashMap::new(), data)
+        {
             Ok((problem_type, target_col)) => {
                 println!("  Target column: {} (auto-detected)", target_col);
                 println!("  Problem type: {}", problem_type);
@@ -439,16 +455,24 @@ fn run_dry_run(args: &Args, data: &DataFrame) -> Result<()> {
     if !args.no_type_correction {
         println!("  2. Correct column types");
     }
-    println!("  3. Impute missing values (numeric: {:?}, categorical: {:?})", 
-             args.numeric_imputation, args.categorical_imputation);
-    println!("  4. Handle outliers (strategy: {:?})", args.outlier_strategy);
+    println!(
+        "  3. Impute missing values (numeric: {:?}, categorical: {:?})",
+        args.numeric_imputation, args.categorical_imputation
+    );
+    println!(
+        "  4. Handle outliers (strategy: {:?})",
+        args.outlier_strategy
+    );
     println!("  5. Generate analysis report");
     println!();
 
     // 8. Output files
     println!("OUTPUT FILES (will be created)");
     println!("{}", "-".repeat(40));
-    let output_name = args.output_name.as_deref().unwrap_or("processed_dataset_{problem_type}");
+    let output_name = args
+        .output_name
+        .as_deref()
+        .unwrap_or("processed_dataset_{problem_type}");
     println!("  - {}/{}.csv", args.output, output_name);
     if args.emit_report {
         let input_stem = extract_file_stem(&args.input);
@@ -493,7 +517,7 @@ fn build_pipeline(args: &Args, config: PipelineConfig) -> Result<Pipeline> {
     //     warn!("GEMINI_API_KEY not set. Falling back to rule-based decisions.");
     //     String::new()
     // });
-    
+
     // if api_key.is_empty() {
     //     info!("Running in rule-based mode (no API key)");
     //     return build_pipeline_without_ai(args, config);
@@ -505,9 +529,7 @@ fn build_pipeline(args: &Args, config: PipelineConfig) -> Result<Pipeline> {
     let provider = Arc::new(OpenRouterProvider::new(api_key)?);
     // let provider = Arc::new(GeminiProvider::new(api_key)?);
 
-    let mut builder = Pipeline::builder()
-        .config(config)
-        .ai_provider(provider);
+    let mut builder = Pipeline::builder().config(config).ai_provider(provider);
 
     if !args.quiet {
         builder = builder.on_progress(|update| {
@@ -537,17 +559,17 @@ fn build_pipeline_without_ai(args: &Args, config: PipelineConfig) -> Result<Pipe
         .categorical_imputation(config.default_categorical_imputation)
         .knn_neighbors(config.knn_neighbors)
         .generate_reports(config.generate_reports); // Preserve generate_reports setting
-    
+
     // Preserve target column if set
     if let Some(ref target) = config.target_column {
         config_builder = config_builder.target_column(target);
     }
-    
+
     // Preserve output name if set
     if let Some(ref name) = config.output_name {
         config_builder = config_builder.output_name(name);
     }
-    
+
     let config = config_builder.build()?;
 
     let mut builder = Pipeline::builder().config(config);
@@ -614,7 +636,10 @@ fn handle_pipeline_output(
     if !result.success {
         error!(
             "Preprocessing failed: {}",
-            result.error.as_ref().unwrap_or(&"Unknown error".to_string())
+            result
+                .error
+                .as_ref()
+                .unwrap_or(&"Unknown error".to_string())
         );
         return Err(anyhow!("Processing failed"));
     }
@@ -775,28 +800,31 @@ fn print_human_readable_summary(
     // Actions taken
     if !report.cleaning_actions.is_empty() || !report.processing_steps.is_empty() {
         println!("Actions Taken:");
-        
+
         // Show key cleaning actions
         for action in report.cleaning_actions.iter().take(5) {
             println!("  - {}", action);
         }
-        
+
         // Show key processing steps (filter out verbose ones)
         let key_steps: Vec<_> = report
             .processing_steps
             .iter()
             .filter(|s| {
-                s.contains("impute") || s.contains("Impute") || 
-                s.contains("KNN") || s.contains("median") ||
-                s.contains("mode") || s.contains("outlier")
+                s.contains("impute")
+                    || s.contains("Impute")
+                    || s.contains("KNN")
+                    || s.contains("median")
+                    || s.contains("mode")
+                    || s.contains("outlier")
             })
             .take(5)
             .collect();
-        
+
         for step in key_steps {
             println!("  - {}", step);
         }
-        
+
         if report.cleaning_actions.len() + report.processing_steps.len() > 10 {
             println!(
                 "  ... and {} more actions",
@@ -824,7 +852,7 @@ fn print_human_readable_summary(
 /// Load CSV with multiple fallback strategies
 fn load_csv_with_fallbacks(path: &str) -> Result<DataFrame> {
     use std::path::PathBuf;
-    
+
     // Strategy 1: Standard loading with quote handling
     match CsvReadOptions::default()
         .with_infer_schema_length(Some(100))

@@ -296,11 +296,7 @@ mod tests {
     fn test_identifier_email_pattern() {
         let series = Series::new(
             "contact".into(),
-            &[
-                "alice@example.com",
-                "bob@company.org",
-                "charlie@mail.net",
-            ],
+            &["alice@example.com", "bob@company.org", "charlie@mail.net"],
         );
         let samples = vec![
             "alice@example.com".to_string(),

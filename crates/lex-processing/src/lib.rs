@@ -140,8 +140,8 @@ pub use decisions::{AiDecisionEngine, DecisionEngine, RuleBasedDecisionEngine};
 pub use error::{PreprocessingError, Result as PreprocessingResult, ResultExt};
 pub use imputers::{KNNImputer, StatisticalImputer};
 pub use pipeline::{
-    CancellationToken, ClosureProgressReporter, Pipeline, PipelineBuilder,
-    PreprocessingExecutor, PreprocessingStage, ProgressReporter, ProgressUpdate,
+    CancellationToken, ClosureProgressReporter, Pipeline, PipelineBuilder, PreprocessingExecutor,
+    PreprocessingStage, ProgressReporter, ProgressUpdate,
 };
 pub use quality::DataQualityAnalyzer;
 pub use reporting::{
@@ -153,7 +153,6 @@ pub use types::{
     PipelineResult, PreprocessingAction, PreprocessingSummary, SolutionOption,
 };
 pub use utils::{
-    clean_numeric_string, dtype_category_str, fill_numeric_nulls, fill_string_nulls,
-    get_dtype_category, is_boolean_string, is_error_marker, is_numeric_dtype,
-    parse_numeric_string, DtypeCategory,
+    DtypeCategory, clean_numeric_string, dtype_category_str, fill_numeric_nulls, fill_string_nulls,
+    get_dtype_category, is_boolean_string, is_error_marker, is_numeric_dtype, parse_numeric_string,
 };

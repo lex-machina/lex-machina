@@ -8,11 +8,11 @@ use crate::cleaner::{DataCleaner, TypeCorrector};
 use crate::config::PipelineConfig;
 use crate::decisions::{AiDecisionEngine, DecisionEngine, RuleBasedDecisionEngine};
 use crate::error::{PreprocessingError, Result};
+use crate::pipeline::PreprocessingExecutor;
 use crate::pipeline::progress::{
     CancellationToken, ClosureProgressReporter, PreprocessingStage, ProgressReporter,
     ProgressUpdate,
 };
-use crate::pipeline::PreprocessingExecutor;
 use crate::profiler::DataProfiler;
 use crate::quality::DataQualityAnalyzer;
 use crate::reporting::ReportGenerator;
@@ -120,7 +120,7 @@ impl Pipeline {
 
     fn process_internal(&self, df: DataFrame) -> Result<PipelineResult> {
         let start_time = Instant::now();
-        
+
         info!("Starting preprocessing pipeline...");
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::Initializing,
@@ -132,7 +132,7 @@ impl Pipeline {
         let mut summary = PreprocessingSummary::new();
         summary.rows_before = df.height();
         summary.columns_before = df.width();
-        
+
         // Calculate initial data quality score (percentage of non-null values)
         summary.data_quality_score_before = self.calculate_data_quality_score(&df);
 
@@ -149,15 +149,15 @@ impl Pipeline {
                 "Performing type correction...",
             ));
             info!("Step 1: Performing type correction...");
-            
+
             let temp_profile = DataProfiler::profile_dataset(&df)
                 .map_err(|e| PreprocessingError::ProfilingFailed(e.to_string()))?;
-            
+
             let (corrected_df, type_steps) = self
                 .type_corrector
                 .correct_column_types(df, &temp_profile.column_profiles)
                 .map_err(|e| PreprocessingError::CleaningFailed(e.to_string()))?;
-            
+
             // Track type corrections in summary
             let corrections_count = type_steps.len();
             if corrections_count > 0 {
@@ -170,15 +170,15 @@ impl Pipeline {
                     .with_details(type_steps.join("; ")),
                 );
             }
-            
+
             processing_steps.extend(type_steps);
-            
+
             self.report_progress(ProgressUpdate::new(
                 PreprocessingStage::TypeCorrection,
                 1.0,
                 "Type correction complete",
             ));
-            
+
             corrected_df
         } else {
             info!("Step 1: Skipping type correction (disabled)");
@@ -194,10 +194,10 @@ impl Pipeline {
             "Profiling dataset...",
         ));
         info!("Step 2: Profiling dataset...");
-        
+
         let profile = DataProfiler::profile_dataset(&df)
             .map_err(|e| PreprocessingError::ProfilingFailed(e.to_string()))?;
-        
+
         debug!("Shape: {:?}", profile.shape);
         for col in &profile.column_profiles {
             debug!(
@@ -205,13 +205,13 @@ impl Pipeline {
                 col.name, col.dtype, col.inferred_type
             );
         }
-        
+
         // Initialize column summaries from profile
         for col_profile in &profile.column_profiles {
             let col_summary = ColumnSummary::new(&col_profile.name, &col_profile.dtype);
             summary.add_column_summary(col_summary);
         }
-        
+
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::Profiling,
             1.0,
@@ -227,19 +227,19 @@ impl Pipeline {
             "Performing automatic cleaning...",
         ));
         info!("Step 3: Performing automatic cleaning...");
-        
+
         let rows_before_cleaning = df.height();
         let cols_before_cleaning = df.width();
-        
+
         let (df, mut new_cleaning_actions) = self
             .cleaner
             .perform_automatic_cleaning(df, &profile)
             .map_err(|e| PreprocessingError::CleaningFailed(e.to_string()))?;
-        
+
         // Track rows/columns removed during cleaning
         let rows_removed = rows_before_cleaning.saturating_sub(df.height());
         let cols_removed = cols_before_cleaning.saturating_sub(df.width());
-        
+
         if rows_removed > 0 {
             summary.add_action(PreprocessingAction::new(
                 ActionType::RowsRemoved,
@@ -247,7 +247,7 @@ impl Pipeline {
                 format!("Removed {} rows during cleaning", rows_removed),
             ));
         }
-        
+
         if cols_removed > 0 {
             summary.add_action(PreprocessingAction::new(
                 ActionType::ColumnRemoved,
@@ -255,7 +255,7 @@ impl Pipeline {
                 format!("Removed {} columns during cleaning", cols_removed),
             ));
         }
-        
+
         // Track duplicate removal from cleaning actions
         for action in &new_cleaning_actions {
             if action.to_lowercase().contains("duplicate") {
@@ -266,9 +266,9 @@ impl Pipeline {
                 ));
             }
         }
-        
+
         cleaning_actions.append(&mut new_cleaning_actions);
-        
+
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::Cleaning,
             1.0,
@@ -284,19 +284,19 @@ impl Pipeline {
             "Analyzing data quality...",
         ));
         info!("Step 4: Final profiling after cleaning...");
-        
+
         let final_profile = DataProfiler::profile_dataset(&df)
             .map_err(|e| PreprocessingError::ProfilingFailed(e.to_string()))?;
-        
+
         debug!("Final shape: {:?}", (df.height(), df.width()));
 
         // Step 5: Identify issues and make decisions
         info!("Step 5: Identifying data quality issues...");
         let issues = DataQualityAnalyzer::identify_issues(&final_profile, &df)
             .map_err(|e| PreprocessingError::ProfilingFailed(e.to_string()))?;
-        
+
         summary.issues_found = issues.len();
-        
+
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::QualityAnalysis,
             1.0,
@@ -311,23 +311,23 @@ impl Pipeline {
             0.0,
             "Making preprocessing decisions...",
         ));
-        
+
         let (user_choices, problem_type, target_column) =
             self.make_decisions(&final_profile, &issues, &df)?;
-        
+
         // Track problem type and target detection
         summary.add_action(PreprocessingAction::new(
             ActionType::ProblemTypeDetected,
             "dataset",
             format!("Detected problem type: {}", problem_type),
         ));
-        
+
         summary.add_action(PreprocessingAction::new(
             ActionType::TargetIdentified,
             &target_column,
             format!("Identified target column: {}", target_column),
         ));
-        
+
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::DecisionMaking,
             1.0,
@@ -341,14 +341,18 @@ impl Pipeline {
 
         // Step 7: Remove date columns if needed
         let cols_before_date_removal = df.width();
-        let df = self.remove_date_columns_if_needed(&df, &problem_type, &final_profile, &target_column)?;
-        
+        let df =
+            self.remove_date_columns_if_needed(&df, &problem_type, &final_profile, &target_column)?;
+
         let date_cols_removed = cols_before_date_removal.saturating_sub(df.width());
         if date_cols_removed > 0 {
             summary.add_action(PreprocessingAction::new(
                 ActionType::ColumnRemoved,
                 "dataset",
-                format!("Removed {} date columns (not suitable for {})", date_cols_removed, problem_type),
+                format!(
+                    "Removed {} date columns (not suitable for {})",
+                    date_cols_removed, problem_type
+                ),
             ));
         }
 
@@ -359,28 +363,32 @@ impl Pipeline {
             "Executing preprocessing...",
         ));
         info!("Step 6: Executing preprocessing...");
-        
+
         let (mut df_for_training, df_with_ids, execution_steps) = self
             .executor
             .execute_comprehensive_preprocessing(df, &final_profile, &user_choices, &target_column)
             .map_err(|e| PreprocessingError::CleaningFailed(e.to_string()))?;
-        
+
         // Track imputation actions from execution steps
         for step in &execution_steps {
             let step_lower = step.to_lowercase();
             if step_lower.contains("impute") || step_lower.contains("fill") {
-                summary.add_action(
-                    PreprocessingAction::new(ActionType::ValueImputed, "dataset", step.clone())
-                );
+                summary.add_action(PreprocessingAction::new(
+                    ActionType::ValueImputed,
+                    "dataset",
+                    step.clone(),
+                ));
             } else if step_lower.contains("outlier") {
-                summary.add_action(
-                    PreprocessingAction::new(ActionType::OutlierHandled, "dataset", step.clone())
-                );
+                summary.add_action(PreprocessingAction::new(
+                    ActionType::OutlierHandled,
+                    "dataset",
+                    step.clone(),
+                ));
             }
         }
-        
+
         processing_steps.extend(execution_steps);
-        
+
         self.report_progress(ProgressUpdate::new(
             PreprocessingStage::Imputation,
             1.0,
@@ -389,48 +397,56 @@ impl Pipeline {
 
         self.check_cancelled()?;
 
-        // Step 9: Save output files
-        self.report_progress(ProgressUpdate::new(
-            PreprocessingStage::ReportGeneration,
-            0.0,
-            "Saving output files...",
-        ));
-        info!("Step 7: Saving output files...");
+        // Step 9: Save output files (only if save_to_disk is enabled)
+        let analysis_report = if self.config.save_to_disk {
+            self.report_progress(ProgressUpdate::new(
+                PreprocessingStage::ReportGeneration,
+                0.0,
+                "Saving output files...",
+            ));
+            info!("Step 7: Saving output files...");
 
-        // Always save the processed CSV (this is the main output)
-        self.reporter
-            .generate_files(
-                &problem_type,
-                &df_with_ids,
-                &mut df_for_training,
-                &target_column,
-            )
-            .map_err(|e| PreprocessingError::ReportGenerationFailed(e.to_string()))?;
-
-        // Generate JSON analysis report only if enabled
-        let analysis_report = if self.config.generate_reports {
-            let report = self
-                .reporter
-                .generate_comprehensive_analysis_report(
-                    &df_with_ids,
-                    &df_for_training,
-                    &final_profile,
-                    &processing_steps,
-                    &cleaning_actions,
+            // Save the processed CSV
+            self.reporter
+                .generate_files(
                     &problem_type,
+                    &df_with_ids,
+                    &mut df_for_training,
                     &target_column,
                 )
                 .map_err(|e| PreprocessingError::ReportGenerationFailed(e.to_string()))?;
-            Some(report)
+
+            // Generate JSON analysis report only if enabled
+            let report = if self.config.generate_reports {
+                let r = self
+                    .reporter
+                    .generate_comprehensive_analysis_report(
+                        &df_with_ids,
+                        &df_for_training,
+                        &final_profile,
+                        &processing_steps,
+                        &cleaning_actions,
+                        &problem_type,
+                        &target_column,
+                    )
+                    .map_err(|e| PreprocessingError::ReportGenerationFailed(e.to_string()))?;
+                Some(r)
+            } else {
+                None
+            };
+
+            self.report_progress(ProgressUpdate::new(
+                PreprocessingStage::ReportGeneration,
+                1.0,
+                "Output files saved",
+            ));
+
+            report
         } else {
+            // In-memory mode: skip all file I/O
+            debug!("Skipping file output (save_to_disk=false)");
             None
         };
-
-        self.report_progress(ProgressUpdate::new(
-            PreprocessingStage::ReportGeneration,
-            1.0,
-            "Output files saved",
-        ));
 
         // Finalize summary
         summary.duration_ms = start_time.elapsed().as_millis() as u64;
@@ -439,15 +455,15 @@ impl Pipeline {
         summary.rows_removed = summary.rows_before.saturating_sub(summary.rows_after);
         summary.columns_removed = summary.columns_before.saturating_sub(summary.columns_after);
         summary.data_quality_score_after = self.calculate_data_quality_score(&df_for_training);
-        
+
         // Estimate issues resolved (simple heuristic: resolved = found - remaining nulls)
-        summary.issues_resolved = summary.issues_found.saturating_sub(
-            self.count_remaining_issues(&df_for_training)
-        );
-        
+        summary.issues_resolved = summary
+            .issues_found
+            .saturating_sub(self.count_remaining_issues(&df_for_training));
+
         // Update column summaries with final types
         self.update_column_summaries(&mut summary, &df_for_training);
-        
+
         // Add any warnings
         if summary.rows_removed_percentage() > 30.0 {
             summary.add_warning(format!(
@@ -464,7 +480,8 @@ impl Pipeline {
 
         Ok(PipelineResult {
             success: true,
-            cleaned_data: Some(format!("{:?}", df_for_training)),
+            dataframe: Some(df_for_training.clone()),
+            cleaned_data_path: None, // Set by report generator if saving to disk
             target_column: Some(target_column),
             problem_type: Some(problem_type),
             ai_choices: user_choices,
@@ -481,32 +498,32 @@ impl Pipeline {
         if df.height() == 0 || df.width() == 0 {
             return 0.0;
         }
-        
+
         let total_cells = df.height() * df.width();
         let mut null_count = 0usize;
-        
+
         for col in df.get_columns() {
             null_count += col.null_count();
         }
-        
+
         let non_null = total_cells.saturating_sub(null_count);
         non_null as f32 / total_cells as f32
     }
-    
+
     /// Count remaining data quality issues in the dataframe.
     fn count_remaining_issues(&self, df: &DataFrame) -> usize {
         let mut issue_count = 0;
-        
+
         for col in df.get_columns() {
             // Count columns with remaining nulls as issues
             if col.null_count() > 0 {
                 issue_count += 1;
             }
         }
-        
+
         issue_count
     }
-    
+
     /// Update column summaries with final data types after processing.
     fn update_column_summaries(&self, summary: &mut PreprocessingSummary, df: &DataFrame) {
         let final_columns: HashMap<String, String> = df
@@ -514,7 +531,7 @@ impl Pipeline {
             .iter()
             .map(|col| (col.name().to_string(), col.dtype().to_string()))
             .collect();
-        
+
         for col_summary in &mut summary.column_summaries {
             if let Some(final_type) = final_columns.get(&col_summary.name) {
                 col_summary.final_type = final_type.clone();
@@ -772,10 +789,7 @@ impl PipelineBuilder {
         config.validate()?;
 
         // Create report generator with config's output settings
-        let reporter = ReportGenerator::new(
-            config.output_dir.clone(),
-            config.output_name.clone(),
-        );
+        let reporter = ReportGenerator::new(config.output_dir.clone(), config.output_name.clone());
 
         Ok(Pipeline {
             config,
@@ -871,9 +885,6 @@ mod tests {
         token.cancel();
         let result = pipeline.check_cancelled();
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            PreprocessingError::Cancelled
-        ));
+        assert!(matches!(result.unwrap_err(), PreprocessingError::Cancelled));
     }
 }

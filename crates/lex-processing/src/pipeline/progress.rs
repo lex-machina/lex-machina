@@ -27,8 +27,8 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Stages of the preprocessing pipeline.
 ///
@@ -516,8 +516,14 @@ mod tests {
 
     #[test]
     fn test_preprocessing_stage_display_name() {
-        assert_eq!(PreprocessingStage::Profiling.display_name(), "Profiling Dataset");
-        assert_eq!(PreprocessingStage::Imputation.display_name(), "Imputing Values");
+        assert_eq!(
+            PreprocessingStage::Profiling.display_name(),
+            "Profiling Dataset"
+        );
+        assert_eq!(
+            PreprocessingStage::Imputation.display_name(),
+            "Imputing Values"
+        );
         assert_eq!(PreprocessingStage::Complete.display_name(), "Complete");
     }
 
@@ -536,7 +542,10 @@ mod tests {
         ];
 
         let total_weight: f32 = stages.iter().map(|s| s.weight()).sum();
-        assert!((total_weight - 1.0).abs() < 0.01, "Weights should sum to ~1.0");
+        assert!(
+            (total_weight - 1.0).abs() < 0.01,
+            "Weights should sum to ~1.0"
+        );
     }
 
     #[test]
@@ -552,7 +561,10 @@ mod tests {
         let json = serde_json::to_string(&update).expect("Should serialize");
 
         // Verify key fields are present in JSON
-        assert!(json.contains("\"stage\":\"imputation\""), "Stage should be snake_case");
+        assert!(
+            json.contains("\"stage\":\"imputation\""),
+            "Stage should be snake_case"
+        );
         assert!(json.contains("\"sub_stage\":\"Column: Age\""));
         assert!(json.contains("\"items_processed\":5"));
         assert!(json.contains("\"items_total\":10"));
@@ -576,7 +588,10 @@ mod tests {
             (PreprocessingStage::Cleaning, "\"cleaning\""),
             (PreprocessingStage::Imputation, "\"imputation\""),
             (PreprocessingStage::OutlierHandling, "\"outlier_handling\""),
-            (PreprocessingStage::ReportGeneration, "\"report_generation\""),
+            (
+                PreprocessingStage::ReportGeneration,
+                "\"report_generation\"",
+            ),
             (PreprocessingStage::Complete, "\"complete\""),
             (PreprocessingStage::Cancelled, "\"cancelled\""),
             (PreprocessingStage::Failed, "\"failed\""),
@@ -584,7 +599,11 @@ mod tests {
 
         for (stage, expected_json) in stage_expectations {
             let json = serde_json::to_string(&stage).expect("Should serialize");
-            assert_eq!(json, expected_json, "PreprocessingStage::{:?} should serialize to {}", stage, expected_json);
+            assert_eq!(
+                json, expected_json,
+                "PreprocessingStage::{:?} should serialize to {}",
+                stage, expected_json
+            );
         }
     }
 
@@ -603,7 +622,10 @@ mod tests {
         token.cancel();
 
         let was_cancelled = handle.join().expect("Thread should not panic");
-        assert!(was_cancelled, "Cancellation should be visible across threads");
+        assert!(
+            was_cancelled,
+            "Cancellation should be visible across threads"
+        );
     }
 
     #[test]

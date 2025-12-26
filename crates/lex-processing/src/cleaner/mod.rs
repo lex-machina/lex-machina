@@ -66,7 +66,10 @@ impl DataCleaner {
 
         if !high_missing_cols.is_empty() {
             // Convert Vec<String> to PlSmallStr for drop_many
-            let cols_ref: Vec<PlSmallStr> = high_missing_cols.iter().map(|s| s.as_str().into()).collect();
+            let cols_ref: Vec<PlSmallStr> = high_missing_cols
+                .iter()
+                .map(|s| s.as_str().into())
+                .collect();
             df = df.drop_many(cols_ref);
             cleaning_actions.push(format!(
                 "Automatically removed {} columns with >70% missing values: {:?}",
@@ -92,9 +95,10 @@ impl DataCleaner {
                 let series = col.as_materialized_series();
                 let null_mask = series.is_null();
                 if let Ok(null_int) = null_mask.cast(&DataType::UInt32)
-                    && let Ok(sum) = &null_counts + &null_int {
-                        null_counts = sum;
-                    }
+                    && let Ok(sum) = &null_counts + &null_int
+                {
+                    null_counts = sum;
+                }
             }
 
             // Calculate percentage - cast to Float64 first

@@ -197,7 +197,7 @@ mod tests {
     fn test_string_to_float64_basic() {
         let series = Series::new("values".into(), &["1.5", "2.5", "3.5"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Float64);
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 1.5);
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), 2.5);
@@ -208,9 +208,12 @@ mod tests {
     fn test_string_to_float64_with_currency() {
         let series = Series::new("price".into(), &["$1,234.56", "€100.50", "£999.99"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Float64);
-        assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 1234.56);
+        assert_eq!(
+            result.get(0).unwrap().try_extract::<f64>().unwrap(),
+            1234.56
+        );
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), 100.50);
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), 999.99);
     }
@@ -219,7 +222,7 @@ mod tests {
     fn test_string_to_float64_with_percentage() {
         let series = Series::new("pct".into(), &["75%", "50.5%", "100%"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Float64);
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 75.0);
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), 50.5);
@@ -230,7 +233,7 @@ mod tests {
     fn test_string_to_float64_with_whitespace() {
         let series = Series::new("values".into(), &["  42  ", " -3.14 ", "\t10.0\n"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 42.0);
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), -3.14);
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), 10.0);
@@ -238,9 +241,12 @@ mod tests {
 
     #[test]
     fn test_string_to_float64_with_error_markers() {
-        let series = Series::new("values".into(), &["ERROR", "N/A", "null", "UNKNOWN", "#N/A"]);
+        let series = Series::new(
+            "values".into(),
+            &["ERROR", "N/A", "null", "UNKNOWN", "#N/A"],
+        );
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         // All error markers should become null
         assert_eq!(result.null_count(), 5);
     }
@@ -249,7 +255,7 @@ mod tests {
     fn test_string_to_float64_with_empty_strings() {
         let series = Series::new("values".into(), &["", "  ", "42"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert!(is_null_at(&result, 0));
         assert!(is_null_at(&result, 1));
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), 42.0);
@@ -259,7 +265,7 @@ mod tests {
     fn test_string_to_float64_with_nulls() {
         let series = Series::new("values".into(), &[Some("1.0"), None, Some("3.0")]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 1.0);
         assert!(is_null_at(&result, 1));
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), 3.0);
@@ -269,7 +275,7 @@ mod tests {
     fn test_string_to_float64_negative_numbers() {
         let series = Series::new("values".into(), &["-1.5", "-100", "-.5"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), -1.5);
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), -100.0);
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), -0.5);
@@ -279,7 +285,7 @@ mod tests {
     fn test_string_to_float64_scientific_notation() {
         let series = Series::new("values".into(), &["1e10", "2.5e-3", "1E6"]);
         let result = string_to_numeric(&series, &DataType::Float64).unwrap();
-        
+
         assert_eq!(result.get(0).unwrap().try_extract::<f64>().unwrap(), 1e10);
         assert_eq!(result.get(1).unwrap().try_extract::<f64>().unwrap(), 2.5e-3);
         assert_eq!(result.get(2).unwrap().try_extract::<f64>().unwrap(), 1e6);
@@ -293,7 +299,7 @@ mod tests {
     fn test_string_to_int64_basic() {
         let series = Series::new("values".into(), &["1", "2", "3"]);
         let result = string_to_numeric(&series, &DataType::Int64).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Int64);
         assert_eq!(result.get(0).unwrap().try_extract::<i64>().unwrap(), 1);
         assert_eq!(result.get(1).unwrap().try_extract::<i64>().unwrap(), 2);
@@ -304,7 +310,7 @@ mod tests {
     fn test_string_to_int64_truncates_floats() {
         let series = Series::new("values".into(), &["1.9", "2.1", "3.5"]);
         let result = string_to_numeric(&series, &DataType::Int64).unwrap();
-        
+
         // Floats should be truncated to integers
         assert_eq!(result.get(0).unwrap().try_extract::<i64>().unwrap(), 1);
         assert_eq!(result.get(1).unwrap().try_extract::<i64>().unwrap(), 2);
@@ -315,9 +321,12 @@ mod tests {
     fn test_string_to_int64_with_commas() {
         let series = Series::new("values".into(), &["1,000", "1,000,000", "999"]);
         let result = string_to_numeric(&series, &DataType::Int64).unwrap();
-        
+
         assert_eq!(result.get(0).unwrap().try_extract::<i64>().unwrap(), 1000);
-        assert_eq!(result.get(1).unwrap().try_extract::<i64>().unwrap(), 1000000);
+        assert_eq!(
+            result.get(1).unwrap().try_extract::<i64>().unwrap(),
+            1000000
+        );
         assert_eq!(result.get(2).unwrap().try_extract::<i64>().unwrap(), 999);
     }
 
@@ -325,7 +334,7 @@ mod tests {
     fn test_string_to_int64_with_error_markers() {
         let series = Series::new("values".into(), &["ERROR", "42", "N/A"]);
         let result = string_to_numeric(&series, &DataType::Int64).unwrap();
-        
+
         assert!(is_null_at(&result, 0));
         assert_eq!(result.get(1).unwrap().try_extract::<i64>().unwrap(), 42);
         assert!(is_null_at(&result, 2));
@@ -339,7 +348,7 @@ mod tests {
     fn test_string_to_int32_basic() {
         let series = Series::new("values".into(), &["100", "200", "300"]);
         let result = string_to_numeric(&series, &DataType::Int32).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Int32);
         assert_eq!(result.get(0).unwrap().try_extract::<i32>().unwrap(), 100);
         assert_eq!(result.get(1).unwrap().try_extract::<i32>().unwrap(), 200);
@@ -350,7 +359,7 @@ mod tests {
     fn test_string_to_numeric_unsupported_dtype() {
         let series = Series::new("values".into(), &["1", "2", "3"]);
         let result = string_to_numeric(&series, &DataType::Boolean).unwrap();
-        
+
         // Should return clone of original for unsupported types
         assert_eq!(result.dtype(), &DataType::String);
     }
@@ -364,7 +373,7 @@ mod tests {
         // Timestamp in seconds (10-digit, 2020-01-01)
         let series = Series::new("ts".into(), &["1577836800"]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         // Should convert seconds to milliseconds
         assert!(matches!(result.dtype(), DataType::Datetime(_, _)));
     }
@@ -374,7 +383,7 @@ mod tests {
         // Timestamp in milliseconds (13-digit, 2020-01-01)
         let series = Series::new("ts".into(), &["1577836800000"]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         assert!(matches!(result.dtype(), DataType::Datetime(_, _)));
     }
 
@@ -383,7 +392,7 @@ mod tests {
         // Timestamps outside valid range
         let series = Series::new("ts".into(), &["100", "999999999999999"]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         // Should have nulls for invalid timestamps
         assert_eq!(result.null_count(), 2);
     }
@@ -392,7 +401,7 @@ mod tests {
     fn test_timestamp_to_datetime_with_nulls() {
         let series = Series::new("ts".into(), &[Some("1577836800"), None]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         assert!(matches!(result.dtype(), DataType::Datetime(_, _)));
         // Original null should be preserved
         assert!(is_null_at(&result, 1));
@@ -402,7 +411,7 @@ mod tests {
     fn test_timestamp_to_datetime_non_numeric_string() {
         let series = Series::new("ts".into(), &["not_a_timestamp", "abc"]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         // Non-numeric strings should become null
         assert_eq!(result.null_count(), 2);
     }
@@ -412,7 +421,7 @@ mod tests {
         // If already numeric, should cast directly
         let series = Series::new("ts".into(), &[1577836800000_i64, 1577923200000_i64]);
         let result = timestamp_to_datetime(&series).unwrap();
-        
+
         assert!(matches!(result.dtype(), DataType::Datetime(_, _)));
     }
 
@@ -424,7 +433,7 @@ mod tests {
     fn test_string_to_boolean_true_values() {
         let series = Series::new("bool".into(), &["true", "TRUE", "True", "t", "T"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Boolean);
         for i in 0..5 {
             assert!(get_bool_at(&result, i));
@@ -435,7 +444,7 @@ mod tests {
     fn test_string_to_boolean_false_values() {
         let series = Series::new("bool".into(), &["false", "FALSE", "False", "f", "F"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert_eq!(result.dtype(), &DataType::Boolean);
         for i in 0..5 {
             assert!(!get_bool_at(&result, i));
@@ -446,7 +455,7 @@ mod tests {
     fn test_string_to_boolean_yes_no() {
         let series = Series::new("bool".into(), &["yes", "YES", "no", "NO", "y", "n"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert!(get_bool_at(&result, 0));
         assert!(get_bool_at(&result, 1));
         assert!(!get_bool_at(&result, 2));
@@ -459,7 +468,7 @@ mod tests {
     fn test_string_to_boolean_numeric_strings() {
         let series = Series::new("bool".into(), &["1", "0"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert!(get_bool_at(&result, 0));
         assert!(!get_bool_at(&result, 1));
     }
@@ -468,7 +477,7 @@ mod tests {
     fn test_string_to_boolean_with_whitespace() {
         let series = Series::new("bool".into(), &["  true  ", " false ", "\tyes\n"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert!(get_bool_at(&result, 0));
         assert!(!get_bool_at(&result, 1));
         assert!(get_bool_at(&result, 2));
@@ -478,7 +487,7 @@ mod tests {
     fn test_string_to_boolean_invalid_values() {
         let series = Series::new("bool".into(), &["maybe", "unknown", "2", "active"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         // Invalid values should become null
         assert_eq!(result.null_count(), 4);
     }
@@ -487,7 +496,7 @@ mod tests {
     fn test_string_to_boolean_with_nulls() {
         let series = Series::new("bool".into(), &[Some("true"), None, Some("false")]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert!(get_bool_at(&result, 0));
         assert!(is_null_at(&result, 1));
         assert!(!get_bool_at(&result, 2));
@@ -497,7 +506,7 @@ mod tests {
     fn test_string_to_boolean_mixed_valid_invalid() {
         let series = Series::new("bool".into(), &["true", "invalid", "no", "garbage"]);
         let result = string_to_boolean(&series).unwrap();
-        
+
         assert!(get_bool_at(&result, 0));
         assert!(is_null_at(&result, 1));
         assert!(!get_bool_at(&result, 2));

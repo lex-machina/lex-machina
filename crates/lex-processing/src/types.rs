@@ -60,21 +60,134 @@ pub struct DecisionQuestion {
     pub sample_data: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Result of running the preprocessing pipeline.
+///
+/// Contains the cleaned DataFrame (if successful), along with metadata
+/// about the preprocessing decisions and a detailed summary.
+///
+/// # Serialization
+///
+/// The `dataframe` field is skipped during serialization since DataFrames
+/// are too large to serialize directly. Use `cleaned_data_path` to access
+/// the saved file path, or access the DataFrame directly for in-memory use.
 pub struct PipelineResult {
     pub success: bool,
-    pub cleaned_data: Option<String>,
+    /// The cleaned DataFrame (in-memory).
+    /// This field is skipped during JSON serialization.
+    pub dataframe: Option<polars::prelude::DataFrame>,
+    /// Path to the saved cleaned data file (if written to disk).
+    pub cleaned_data_path: Option<String>,
     pub target_column: Option<String>,
     pub problem_type: Option<String>,
     pub ai_choices: HashMap<String, String>,
     pub analysis_report: Option<String>,
     pub processing_steps: Vec<String>,
     pub cleaning_actions: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// Detailed summary of preprocessing actions for UI display.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<PreprocessingSummary>,
+}
+
+impl Clone for PipelineResult {
+    fn clone(&self) -> Self {
+        Self {
+            success: self.success,
+            dataframe: self.dataframe.clone(),
+            cleaned_data_path: self.cleaned_data_path.clone(),
+            target_column: self.target_column.clone(),
+            problem_type: self.problem_type.clone(),
+            ai_choices: self.ai_choices.clone(),
+            analysis_report: self.analysis_report.clone(),
+            processing_steps: self.processing_steps.clone(),
+            cleaning_actions: self.cleaning_actions.clone(),
+            error: self.error.clone(),
+            summary: self.summary.clone(),
+        }
+    }
+}
+
+impl std::fmt::Debug for PipelineResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PipelineResult")
+            .field("success", &self.success)
+            .field(
+                "dataframe",
+                &self.dataframe.as_ref().map(|df| format!("DataFrame({} x {})", df.height(), df.width())),
+            )
+            .field("cleaned_data_path", &self.cleaned_data_path)
+            .field("target_column", &self.target_column)
+            .field("problem_type", &self.problem_type)
+            .field("ai_choices", &self.ai_choices)
+            .field("analysis_report", &self.analysis_report)
+            .field("processing_steps", &self.processing_steps)
+            .field("cleaning_actions", &self.cleaning_actions)
+            .field("error", &self.error)
+            .field("summary", &self.summary)
+            .finish()
+    }
+}
+
+// Manual Serialize implementation since we skip the dataframe field
+impl Serialize for PipelineResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PipelineResult", 10)?;
+        state.serialize_field("success", &self.success)?;
+        state.serialize_field("cleaned_data_path", &self.cleaned_data_path)?;
+        state.serialize_field("target_column", &self.target_column)?;
+        state.serialize_field("problem_type", &self.problem_type)?;
+        state.serialize_field("ai_choices", &self.ai_choices)?;
+        state.serialize_field("analysis_report", &self.analysis_report)?;
+        state.serialize_field("processing_steps", &self.processing_steps)?;
+        state.serialize_field("cleaning_actions", &self.cleaning_actions)?;
+        if self.error.is_some() {
+            state.serialize_field("error", &self.error)?;
+        }
+        if self.summary.is_some() {
+            state.serialize_field("summary", &self.summary)?;
+        }
+        state.end()
+    }
+}
+
+// Manual Deserialize implementation
+impl<'de> Deserialize<'de> for PipelineResult {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct PipelineResultHelper {
+            success: bool,
+            cleaned_data_path: Option<String>,
+            target_column: Option<String>,
+            problem_type: Option<String>,
+            ai_choices: HashMap<String, String>,
+            analysis_report: Option<String>,
+            processing_steps: Vec<String>,
+            cleaning_actions: Vec<String>,
+            error: Option<String>,
+            summary: Option<PreprocessingSummary>,
+        }
+
+        let helper = PipelineResultHelper::deserialize(deserializer)?;
+        Ok(PipelineResult {
+            success: helper.success,
+            dataframe: None, // DataFrame cannot be deserialized
+            cleaned_data_path: helper.cleaned_data_path,
+            target_column: helper.target_column,
+            problem_type: helper.problem_type,
+            ai_choices: helper.ai_choices,
+            analysis_report: helper.analysis_report,
+            processing_steps: helper.processing_steps,
+            cleaning_actions: helper.cleaning_actions,
+            error: helper.error,
+            summary: helper.summary,
+        })
+    }
 }
 
 // ============================================================================
@@ -221,7 +334,11 @@ pub struct PreprocessingAction {
 
 impl PreprocessingAction {
     /// Create a new preprocessing action.
-    pub fn new(action_type: ActionType, target: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        action_type: ActionType,
+        target: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             action_type,
             target: target.into(),
@@ -428,12 +545,9 @@ mod tests {
 
     #[test]
     fn test_preprocessing_action_with_details() {
-        let action = PreprocessingAction::new(
-            ActionType::ValueImputed,
-            "age",
-            "Imputed 15 missing values",
-        )
-        .with_details("Used median imputation (value: 32)");
+        let action =
+            PreprocessingAction::new(ActionType::ValueImputed, "age", "Imputed 15 missing values")
+                .with_details("Used median imputation (value: 32)");
 
         assert_eq!(action.action_type, ActionType::ValueImputed);
         assert_eq!(action.target, "age");
@@ -445,7 +559,10 @@ mod tests {
     fn test_action_type_display_name() {
         assert_eq!(ActionType::ColumnRemoved.display_name(), "Column Removed");
         assert_eq!(ActionType::ValueImputed.display_name(), "Value Imputed");
-        assert_eq!(ActionType::DuplicatesRemoved.display_name(), "Duplicates Removed");
+        assert_eq!(
+            ActionType::DuplicatesRemoved.display_name(),
+            "Duplicates Removed"
+        );
     }
 
     #[test]
@@ -459,8 +576,7 @@ mod tests {
 
     #[test]
     fn test_column_summary_mark_removed() {
-        let summary = ColumnSummary::new("temp_col", "String")
-            .mark_removed("Over 90% null values");
+        let summary = ColumnSummary::new("temp_col", "String").mark_removed("Over 90% null values");
 
         assert!(summary.was_removed);
         assert_eq!(summary.removal_reason.unwrap(), "Over 90% null values");
@@ -487,7 +603,8 @@ mod tests {
     fn test_pipeline_result_json_roundtrip() {
         let mut result = PipelineResult {
             success: true,
-            cleaned_data: Some("path/to/data.csv".to_string()),
+            dataframe: None, // DataFrame is not serialized
+            cleaned_data_path: Some("path/to/data.csv".to_string()),
             target_column: Some("survived".to_string()),
             problem_type: Some("binary_classification".to_string()),
             ai_choices: HashMap::from([
@@ -514,6 +631,8 @@ mod tests {
             result.summary.as_ref().unwrap().rows_before,
             deserialized.summary.as_ref().unwrap().rows_before
         );
+        // dataframe is not serialized, so it will be None after deserialization
+        assert!(deserialized.dataframe.is_none());
     }
 
     #[test]
@@ -550,7 +669,11 @@ mod tests {
 
         for (action_type, expected) in all_types.iter().zip(expected_json_values.iter()) {
             let json = serde_json::to_string(action_type).expect("Should serialize");
-            assert_eq!(&json, *expected, "ActionType::{:?} should serialize to {}", action_type, expected);
+            assert_eq!(
+                &json, *expected,
+                "ActionType::{:?} should serialize to {}",
+                action_type, expected
+            );
         }
     }
 }

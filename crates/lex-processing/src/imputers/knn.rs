@@ -26,9 +26,16 @@ impl KNNImputer {
                     series.null_count() > 0
                         && matches!(
                             series.dtype(),
-                            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 |
-                            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 |
-                            DataType::Float32 | DataType::Float64
+                            DataType::Int8
+                                | DataType::Int16
+                                | DataType::Int32
+                                | DataType::Int64
+                                | DataType::UInt8
+                                | DataType::UInt16
+                                | DataType::UInt32
+                                | DataType::UInt64
+                                | DataType::Float32
+                                | DataType::Float64
                         )
                 } else {
                     false
@@ -50,9 +57,16 @@ impl KNNImputer {
             .filter(|col| {
                 matches!(
                     col.dtype(),
-                    DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 |
-                    DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 |
-                    DataType::Float32 | DataType::Float64
+                    DataType::Int8
+                        | DataType::Int16
+                        | DataType::Int32
+                        | DataType::Int64
+                        | DataType::UInt8
+                        | DataType::UInt16
+                        | DataType::UInt32
+                        | DataType::UInt64
+                        | DataType::Float32
+                        | DataType::Float64
                 )
             })
             .map(|col| col.name().to_string())
@@ -80,7 +94,7 @@ impl KNNImputer {
             for row_idx in 0..n_rows {
                 // Check if this row has a null value using the mask
                 let is_null = null_mask.get(row_idx).unwrap_or(false);
-                
+
                 if is_null {
                     // Find K nearest neighbors with non-null values in this column
                     let imputed_value = self.impute_value(
@@ -108,7 +122,11 @@ impl KNNImputer {
     }
 
     /// Create a data matrix from the dataframe for distance calculations
-    fn create_data_matrix(&self, df: &DataFrame, columns: &[String]) -> Result<Vec<Vec<Option<f64>>>> {
+    fn create_data_matrix(
+        &self,
+        df: &DataFrame,
+        columns: &[String],
+    ) -> Result<Vec<Vec<Option<f64>>>> {
         let n_rows = df.height();
         let n_cols = columns.len();
         let mut matrix = vec![vec![None; n_cols]; n_rows];
@@ -138,17 +156,12 @@ impl KNNImputer {
     ) -> Result<f64> {
         // Find all rows that have a non-null value in the target column
         let candidate_rows: Vec<usize> = (0..n_rows)
-            .filter(|&row| {
-                row != target_row && !null_mask.get(row).unwrap_or(true)
-            })
+            .filter(|&row| row != target_row && !null_mask.get(row).unwrap_or(true))
             .collect();
 
         if candidate_rows.is_empty() {
             // Fallback to average of non-null values
-            let sum: f64 = data_matrix
-                .iter()
-                .filter_map(|row| row[target_col])
-                .sum();
+            let sum: f64 = data_matrix.iter().filter_map(|row| row[target_col]).sum();
             let count = data_matrix
                 .iter()
                 .filter(|row| row[target_col].is_some())
@@ -205,10 +218,7 @@ impl KNNImputer {
             Ok(weighted_sum / weight_sum)
         } else {
             // Fallback to simple average
-            let sum: f64 = data_matrix
-                .iter()
-                .filter_map(|row| row[target_col])
-                .sum();
+            let sum: f64 = data_matrix.iter().filter_map(|row| row[target_col]).sum();
             let count = data_matrix
                 .iter()
                 .filter(|row| row[target_col].is_some())
@@ -281,12 +291,13 @@ mod tests {
     #[test]
     fn test_fit_transform_basic_imputation() {
         let imputer = KNNImputer::new(2);
-        
+
         // Create a DataFrame with some missing values
         let df = df![
             "feature1" => [1.0, 2.0, 3.0, 4.0, 5.0],
             "feature2" => [Some(10.0), Some(20.0), None, Some(40.0), Some(50.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -294,7 +305,7 @@ mod tests {
         // Check that null was imputed
         let feature2 = result.column("feature2").unwrap();
         assert_eq!(feature2.null_count(), 0);
-        
+
         // The imputed value should be reasonable (between neighbors)
         let imputed_value = feature2.get(2).unwrap().try_extract::<f64>().unwrap();
         assert!(imputed_value > 15.0 && imputed_value < 45.0);
@@ -303,10 +314,10 @@ mod tests {
     #[test]
     fn test_fit_transform_empty_dataframe() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = DataFrame::empty();
         let columns: Vec<String> = vec![];
-        
+
         let result = imputer.fit_transform(&df, &columns).unwrap();
         assert_eq!(result.height(), 0);
     }
@@ -314,30 +325,59 @@ mod tests {
     #[test]
     fn test_fit_transform_no_missing_values() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = df![
             "feature1" => [1.0, 2.0, 3.0],
             "feature2" => [10.0, 20.0, 30.0],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
 
         // Should return unchanged
-        assert_eq!(result.column("feature2").unwrap().get(0).unwrap().try_extract::<f64>().unwrap(), 10.0);
-        assert_eq!(result.column("feature2").unwrap().get(1).unwrap().try_extract::<f64>().unwrap(), 20.0);
-        assert_eq!(result.column("feature2").unwrap().get(2).unwrap().try_extract::<f64>().unwrap(), 30.0);
+        assert_eq!(
+            result
+                .column("feature2")
+                .unwrap()
+                .get(0)
+                .unwrap()
+                .try_extract::<f64>()
+                .unwrap(),
+            10.0
+        );
+        assert_eq!(
+            result
+                .column("feature2")
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .try_extract::<f64>()
+                .unwrap(),
+            20.0
+        );
+        assert_eq!(
+            result
+                .column("feature2")
+                .unwrap()
+                .get(2)
+                .unwrap()
+                .try_extract::<f64>()
+                .unwrap(),
+            30.0
+        );
     }
 
     #[test]
     fn test_fit_transform_single_row() {
         let imputer = KNNImputer::new(3);
-        
+
         // Single row with a missing value - no neighbors available
         let df = df![
             "feature1" => [1.0],
             "feature2" => [Option::<f64>::None],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -351,11 +391,12 @@ mod tests {
     #[test]
     fn test_fit_transform_all_nulls_in_column() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = df![
             "feature1" => [1.0, 2.0, 3.0],
             "feature2" => [Option::<f64>::None, None, None],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -371,11 +412,12 @@ mod tests {
     #[test]
     fn test_fit_transform_n_neighbors_greater_than_rows() {
         let imputer = KNNImputer::new(10); // More than 3 rows
-        
+
         let df = df![
             "feature1" => [1.0, 2.0, 3.0],
             "feature2" => [Some(10.0), None, Some(30.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -388,11 +430,12 @@ mod tests {
     #[test]
     fn test_fit_transform_skips_non_numeric_columns() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = df![
             "name" => ["Alice", "Bob", "Charlie"],
             "age" => [Some(25.0), None, Some(35.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         // Try to impute both - only "age" should be processed
         let columns = vec!["name".to_string(), "age".to_string()];
@@ -401,7 +444,7 @@ mod tests {
         // Age should be imputed
         let age = result.column("age").unwrap();
         assert_eq!(age.null_count(), 0);
-        
+
         // Name should be unchanged (still strings)
         let name = result.column("name").unwrap();
         assert_eq!(name.get(0).unwrap().to_string(), "\"Alice\"");
@@ -410,12 +453,13 @@ mod tests {
     #[test]
     fn test_fit_transform_multiple_columns() {
         let imputer = KNNImputer::new(2);
-        
+
         let df = df![
             "a" => [1.0, 2.0, 3.0, 4.0],
             "b" => [Some(10.0), None, Some(30.0), Some(40.0)],
             "c" => [Some(100.0), Some(200.0), None, Some(400.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["b".to_string(), "c".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -427,12 +471,13 @@ mod tests {
     #[test]
     fn test_fit_transform_mixed_null_patterns() {
         let imputer = KNNImputer::new(2);
-        
+
         // Complex pattern where rows have nulls in different columns
         let df = df![
             "a" => [Some(1.0), None, Some(3.0), Some(4.0)],
             "b" => [Some(10.0), Some(20.0), None, Some(40.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["a".to_string(), "b".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -444,11 +489,12 @@ mod tests {
     #[test]
     fn test_fit_transform_integer_columns() {
         let imputer = KNNImputer::new(2);
-        
+
         let df = df![
             "feature" => [1i64, 2i64, 3i64],
             "target" => [Some(10i64), None, Some(30i64)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["target".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
@@ -465,11 +511,12 @@ mod tests {
     #[test]
     fn test_create_data_matrix_basic() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = df![
             "a" => [1.0, 2.0, 3.0],
             "b" => [10.0, 20.0, 30.0],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["a".to_string(), "b".to_string()];
         let matrix = imputer.create_data_matrix(&df, &columns).unwrap();
@@ -485,11 +532,12 @@ mod tests {
     #[test]
     fn test_create_data_matrix_with_nulls() {
         let imputer = KNNImputer::new(3);
-        
+
         let df = df![
             "a" => [Some(1.0), None, Some(3.0)],
             "b" => [Some(10.0), Some(20.0), None],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["a".to_string(), "b".to_string()];
         let matrix = imputer.create_data_matrix(&df, &columns).unwrap();
@@ -506,10 +554,10 @@ mod tests {
     #[test]
     fn test_calculate_distance_identical_rows() {
         let imputer = KNNImputer::new(3);
-        
+
         let row1 = vec![Some(1.0), Some(2.0), Some(3.0)];
         let row2 = vec![Some(1.0), Some(2.0), Some(3.0)];
-        
+
         let distance = imputer.calculate_distance(&row1, &row2, 0, 3);
         assert_eq!(distance, 0.0);
     }
@@ -517,10 +565,10 @@ mod tests {
     #[test]
     fn test_calculate_distance_simple() {
         let imputer = KNNImputer::new(3);
-        
+
         let row1 = vec![Some(0.0), Some(0.0), Some(0.0)];
         let row2 = vec![Some(0.0), Some(3.0), Some(4.0)];
-        
+
         // Skip column 0, so distance is sqrt(((3-0)^2 + (4-0)^2) / 2) = sqrt(12.5)
         let distance = imputer.calculate_distance(&row1, &row2, 0, 3);
         let expected = (12.5_f64).sqrt();
@@ -530,10 +578,10 @@ mod tests {
     #[test]
     fn test_calculate_distance_with_nulls() {
         let imputer = KNNImputer::new(3);
-        
+
         let row1 = vec![Some(0.0), None, Some(0.0)];
         let row2 = vec![Some(0.0), Some(3.0), Some(4.0)];
-        
+
         // Column 1 has null in row1, so only column 2 is used
         // Skip column 0, distance = sqrt(16/1) = 4.0
         let distance = imputer.calculate_distance(&row1, &row2, 0, 3);
@@ -543,10 +591,10 @@ mod tests {
     #[test]
     fn test_calculate_distance_no_common_features() {
         let imputer = KNNImputer::new(3);
-        
+
         let row1 = vec![Some(1.0), None, None];
         let row2 = vec![Some(2.0), None, None];
-        
+
         // Skip column 0, columns 1 and 2 both have nulls
         let distance = imputer.calculate_distance(&row1, &row2, 0, 3);
         assert_eq!(distance, f64::INFINITY);
@@ -555,10 +603,10 @@ mod tests {
     #[test]
     fn test_calculate_distance_skips_target_column() {
         let imputer = KNNImputer::new(3);
-        
+
         let row1 = vec![Some(100.0), Some(0.0), Some(0.0)];
         let row2 = vec![Some(0.0), Some(3.0), Some(4.0)];
-        
+
         // Skip column 0 (the large difference), use columns 1 and 2
         let distance = imputer.calculate_distance(&row1, &row2, 0, 3);
         let expected = (12.5_f64).sqrt(); // sqrt((9 + 16) / 2)
@@ -572,47 +620,61 @@ mod tests {
     #[test]
     fn test_impute_uses_weighted_average() {
         let imputer = KNNImputer::new(2);
-        
+
         // Row 0 and Row 2 are neighbors of Row 1
         // Row 0: feature1=1, feature2=10
         // Row 1: feature1=2, feature2=null (to impute)
         // Row 2: feature1=3, feature2=30
-        // 
+        //
         // Distance from Row 1 to Row 0: |2-1| = 1
         // Distance from Row 1 to Row 2: |2-3| = 1
         // Equal distances, so weighted average = (10 + 30) / 2 = 20
-        
+
         let df = df![
             "feature1" => [1.0, 2.0, 3.0],
             "feature2" => [Some(10.0), None, Some(30.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
 
-        let imputed = result.column("feature2").unwrap().get(1).unwrap().try_extract::<f64>().unwrap();
+        let imputed = result
+            .column("feature2")
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .try_extract::<f64>()
+            .unwrap();
         assert!((imputed - 20.0).abs() < 0.1);
     }
 
     #[test]
     fn test_impute_closer_neighbor_has_more_weight() {
         let imputer = KNNImputer::new(2);
-        
+
         // Row 0: feature1=1, feature2=10
         // Row 1: feature1=1.1, feature2=null (to impute) - very close to Row 0
         // Row 2: feature1=10, feature2=100
-        // 
+        //
         // Row 1 is much closer to Row 0, so imputed value should be closer to 10
-        
+
         let df = df![
             "feature1" => [1.0, 1.1, 10.0],
             "feature2" => [Some(10.0), None, Some(100.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
 
-        let imputed = result.column("feature2").unwrap().get(1).unwrap().try_extract::<f64>().unwrap();
+        let imputed = result
+            .column("feature2")
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .try_extract::<f64>()
+            .unwrap();
         // Should be much closer to 10 than to 100
         assert!(imputed < 30.0);
     }
@@ -620,17 +682,24 @@ mod tests {
     #[test]
     fn test_impute_zero_distance_gives_high_weight() {
         let imputer = KNNImputer::new(2);
-        
+
         // Row 0 and Row 1 are identical in feature1 (zero distance)
         let df = df![
             "feature1" => [5.0, 5.0, 100.0],
             "feature2" => [Some(10.0), None, Some(1000.0)],
-        ].unwrap();
+        ]
+        .unwrap();
 
         let columns = vec!["feature2".to_string()];
         let result = imputer.fit_transform(&df, &columns).unwrap();
 
-        let imputed = result.column("feature2").unwrap().get(1).unwrap().try_extract::<f64>().unwrap();
+        let imputed = result
+            .column("feature2")
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .try_extract::<f64>()
+            .unwrap();
         // Should be very close to 10 due to zero distance = very high weight
         assert!((imputed - 10.0).abs() < 1.0);
     }

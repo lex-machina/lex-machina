@@ -50,45 +50,44 @@ pub(crate) fn extract_column_characteristics(
         let non_null = series.drop_nulls();
         if !non_null.is_empty()
             && let Ok(value_counts_df) = non_null.value_counts(true, false, "count".into(), false)
-                && value_counts_df.height() > 0
-                    && let (Ok(counts_col), Ok(values_col)) = (
-                        value_counts_df.column("count"),
-                        value_counts_df.column(non_null.name()),
-                    )
-                        && !counts_col.is_empty() {
-                            let most_freq_value = values_col.get(0)?;
-                            let most_freq = format!("{}", most_freq_value);
+            && value_counts_df.height() > 0
+            && let (Ok(counts_col), Ok(values_col)) = (
+                value_counts_df.column("count"),
+                value_counts_df.column(non_null.name()),
+            )
+            && !counts_col.is_empty()
+        {
+            let most_freq_value = values_col.get(0)?;
+            let most_freq = format!("{}", most_freq_value);
 
-                            characteristics
-                                .insert("most_frequent".to_string(), serde_json::json!(most_freq));
+            characteristics.insert("most_frequent".to_string(), serde_json::json!(most_freq));
 
-                            let counts_col_series = counts_col.as_materialized_series();
-                            let counts: Vec<f64> = counts_col_series
-                                .f64()
-                                .map(|ca| ca.into_iter().flatten().collect())
-                                .unwrap_or_default();
+            let counts_col_series = counts_col.as_materialized_series();
+            let counts: Vec<f64> = counts_col_series
+                .f64()
+                .map(|ca| ca.into_iter().flatten().collect())
+                .unwrap_or_default();
 
-                            if counts.len() > 1 {
-                                let counts_mean: f64 =
-                                    counts.iter().sum::<f64>() / counts.len() as f64;
-                                let variance: f64 = counts
-                                    .iter()
-                                    .map(|c| (c - counts_mean).powi(2))
-                                    .sum::<f64>()
-                                    / counts.len() as f64;
-                                let counts_std = variance.sqrt();
+            if counts.len() > 1 {
+                let counts_mean: f64 = counts.iter().sum::<f64>() / counts.len() as f64;
+                let variance: f64 = counts
+                    .iter()
+                    .map(|c| (c - counts_mean).powi(2))
+                    .sum::<f64>()
+                    / counts.len() as f64;
+                let counts_std = variance.sqrt();
 
-                                let freq_dist = if counts_std < counts_mean {
-                                    "balanced"
-                                } else {
-                                    "imbalanced"
-                                };
-                                characteristics.insert(
-                                    "frequency_distribution".to_string(),
-                                    serde_json::json!(freq_dist),
-                                );
-                            }
-                        }
+                let freq_dist = if counts_std < counts_mean {
+                    "balanced"
+                } else {
+                    "imbalanced"
+                };
+                characteristics.insert(
+                    "frequency_distribution".to_string(),
+                    serde_json::json!(freq_dist),
+                );
+            }
+        }
     }
 
     Ok(characteristics)
@@ -247,7 +246,10 @@ mod tests {
     #[test]
     fn test_detect_outliers_no_outlier() {
         // Data with no outliers (values within 1.5*IQR)
-        let series = Series::new("val".into(), &[1.0f64, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+        let series = Series::new(
+            "val".into(),
+            &[1.0f64, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+        );
         let has_outliers = detect_outliers(&series).unwrap();
         assert!(!has_outliers);
     }

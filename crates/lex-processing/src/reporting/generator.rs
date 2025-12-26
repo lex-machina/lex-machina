@@ -170,7 +170,10 @@ impl Default for ReportGenerator {
 impl ReportGenerator {
     /// Create a new ReportGenerator with custom output settings.
     pub fn new(output_dir: PathBuf, output_name: Option<String>) -> Self {
-        Self { output_dir, output_name }
+        Self {
+            output_dir,
+            output_name,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -206,7 +209,7 @@ impl ReportGenerator {
             problem_type,
             target_column,
         } = params;
-        
+
         // Column type analysis
         let mut type_counts: HashMap<String, usize> = HashMap::new();
         for col in &profile.column_profiles {
@@ -284,7 +287,8 @@ impl ReportGenerator {
         target_column: &str,
     ) -> Result<()> {
         // Use custom output name or default
-        let file_name = self.output_name
+        let file_name = self
+            .output_name
             .as_ref()
             .cloned()
             .unwrap_or_else(|| format!("processed_dataset_{}", problem_type));
@@ -310,72 +314,74 @@ impl ReportGenerator {
         fs::create_dir_all(&self.output_dir)?;
         let output_path = self.output_dir.join(format!("{}.csv", file_name));
         let mut file = File::create(&output_path)?;
-        
+
         // Configure CsvWriter with minimal quoting
         CsvWriter::new(&mut file)
             .include_header(true)
             .with_separator(b',')
-            .with_quote_char(b'"')  // Use standard double quote
+            .with_quote_char(b'"') // Use standard double quote
             .finish(df_for_training)?;
 
         info!("Dataset saved: {}", output_path.display());
-        
+
         // Verify the output doesn't have triple quotes
         self.verify_output(&output_path.to_string_lossy())?;
 
         Ok(())
     }
-    
+
     /// Final cleaning pass to remove any remaining quotes from all string columns
     fn final_cleaning_pass(&self, df: DataFrame) -> Result<DataFrame> {
         let mut df = df;
-        let column_names: Vec<String> = df.get_column_names()
+        let column_names: Vec<String> = df
+            .get_column_names()
             .into_iter()
             .map(|s| s.to_string())
             .collect();
-        
+
         for col_name in &column_names {
             if let Ok(series) = df.column(col_name)
-                && series.dtype() == &DataType::String {
-                    let str_series = series.str()?;
-                    let mut cleaned_values = Vec::with_capacity(str_series.len());
-                    
-                    for opt_val in str_series.into_iter() {
-                        match opt_val {
-                            Some(val) => {
-                                // Remove any remaining quotes
-                                let cleaned = val
-                                    .trim()
-                                    .replace("\"\"\"", "")
-                                    .replace("\"\"", "")
-                                    .replace('\"', "")
-                                    .trim()
-                                    .to_string();
-                                
-                                if cleaned.is_empty() {
-                                    cleaned_values.push(None);
-                                } else {
-                                    cleaned_values.push(Some(cleaned));
-                                }
+                && series.dtype() == &DataType::String
+            {
+                let str_series = series.str()?;
+                let mut cleaned_values = Vec::with_capacity(str_series.len());
+
+                for opt_val in str_series.into_iter() {
+                    match opt_val {
+                        Some(val) => {
+                            // Remove any remaining quotes
+                            let cleaned = val
+                                .trim()
+                                .replace("\"\"\"", "")
+                                .replace("\"\"", "")
+                                .replace('\"', "")
+                                .trim()
+                                .to_string();
+
+                            if cleaned.is_empty() {
+                                cleaned_values.push(None);
+                            } else {
+                                cleaned_values.push(Some(cleaned));
                             }
-                            None => cleaned_values.push(None),
                         }
+                        None => cleaned_values.push(None),
                     }
-                    
-                    let cleaned_series = Series::new(col_name.as_str().into(), cleaned_values);
-                    df.replace(col_name, cleaned_series)?;
                 }
+
+                let cleaned_series = Series::new(col_name.as_str().into(), cleaned_values);
+                df.replace(col_name, cleaned_series)?;
+            }
         }
-        
+
         Ok(df)
     }
-    
+
     /// Verify the output file doesn't have triple quotes
     fn verify_output(&self, path: &str) -> Result<()> {
         use std::fs;
-        
+
         let content = fs::read_to_string(path)?;
-        
+
         // Check for triple quotes
         if content.contains("\"\"\"") {
             warn!("Output file contains triple quotes!");
@@ -383,10 +389,10 @@ impl ReportGenerator {
         } else {
             debug!("Output verification passed - no triple quotes detected");
         }
-        
+
         Ok(())
     }
-    
+
     /// Build a comprehensive report from pipeline results.
     ///
     /// This method creates a single, unified report structure that can be:
@@ -403,18 +409,24 @@ impl ReportGenerator {
     ) -> ComprehensiveReport {
         // Extract summary or use defaults
         let summary = result.summary.as_ref();
-        
+
         // Build processing summary
         let processing_summary = ProcessingSummaryReport {
             duration_ms: summary.map(|s| s.duration_ms).unwrap_or(0),
-            rows_before: summary.map(|s| s.rows_before).unwrap_or(original_df.height()),
+            rows_before: summary
+                .map(|s| s.rows_before)
+                .unwrap_or(original_df.height()),
             rows_after: summary.map(|s| s.rows_after).unwrap_or(final_df.height()),
             rows_removed: summary.map(|s| s.rows_removed).unwrap_or(0),
             rows_removed_percent: summary.map(|s| s.rows_removed_percentage()).unwrap_or(0.0),
-            columns_before: summary.map(|s| s.columns_before).unwrap_or(original_df.width()),
+            columns_before: summary
+                .map(|s| s.columns_before)
+                .unwrap_or(original_df.width()),
             columns_after: summary.map(|s| s.columns_after).unwrap_or(final_df.width()),
             columns_removed: summary.map(|s| s.columns_removed).unwrap_or(0),
-            columns_removed_percent: summary.map(|s| s.columns_removed_percentage()).unwrap_or(0.0),
+            columns_removed_percent: summary
+                .map(|s| s.columns_removed_percentage())
+                .unwrap_or(0.0),
             issues_found: summary.map(|s| s.issues_found).unwrap_or(0),
             issues_resolved: summary.map(|s| s.issues_resolved).unwrap_or(0),
             data_quality_before: summary.map(|s| s.data_quality_score_before).unwrap_or(0.0),
@@ -422,18 +434,25 @@ impl ReportGenerator {
             quality_improvement: summary.map(|s| s.quality_improvement()).unwrap_or(0.0),
             warnings: summary.map(|s| s.warnings.clone()).unwrap_or_default(),
         };
-        
+
         // Build algorithm rationale
         let algorithm_rationale = AlgorithmRationale {
-            problem_type: result.problem_type.clone().unwrap_or_else(|| "unknown".to_string()),
-            size_category: profile.complexity_indicators.get("size_category")
+            problem_type: result
+                .problem_type
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
+            size_category: profile
+                .complexity_indicators
+                .get("size_category")
                 .and_then(|v| v.as_str())
                 .map(String::from),
-            feature_complexity: profile.complexity_indicators.get("feature_complexity")
+            feature_complexity: profile
+                .complexity_indicators
+                .get("feature_complexity")
                 .and_then(|v| v.as_str())
                 .map(String::from),
         };
-        
+
         // Build quality assessment
         let outlier_columns: Vec<String> = profile
             .column_profiles
@@ -446,27 +465,27 @@ impl ReportGenerator {
             })
             .map(|col| col.name.clone())
             .collect();
-            
+
         let high_null_columns: Vec<String> = profile
             .column_profiles
             .iter()
             .filter(|col| col.null_percentage > 50.0)
             .map(|col| col.name.clone())
             .collect();
-        
+
         let quality_assessment = QualityAssessment {
             duplicate_count: profile.duplicate_count,
             duplicate_percentage: format!("{:.1}", profile.duplicate_percentage),
             outlier_columns,
             high_null_columns,
         };
-        
+
         // Build dataset profile summary
         let mut type_counts: HashMap<String, usize> = HashMap::new();
         for col in &profile.column_profiles {
             *type_counts.entry(col.inferred_type.clone()).or_insert(0) += 1;
         }
-        
+
         let type_percentages: HashMap<String, String> = type_counts
             .iter()
             .map(|(k, v)| {
@@ -474,7 +493,7 @@ impl ReportGenerator {
                 (k.clone(), format!("{:.1}", pct))
             })
             .collect();
-        
+
         let dataset_profile = DatasetProfileSummary {
             original_shape: (original_df.height(), original_df.width()),
             final_shape: (final_df.height(), final_df.width()),
@@ -482,7 +501,7 @@ impl ReportGenerator {
             type_percentages,
             target_candidates: profile.target_candidates.clone(),
         };
-        
+
         // Extract column summaries from result or create from profile
         let column_summaries = summary
             .map(|s| s.column_summaries.clone())
@@ -493,7 +512,7 @@ impl ReportGenerator {
                     .map(|col| ColumnSummary::new(&col.name, &col.dtype))
                     .collect()
             });
-        
+
         ComprehensiveReport {
             generated_at: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             input_file: input_file.to_string(),
@@ -510,7 +529,7 @@ impl ReportGenerator {
             column_summaries,
         }
     }
-    
+
     /// Write a comprehensive report to a JSON file.
     ///
     /// The report is written to the output directory with the specified base name.
@@ -521,13 +540,15 @@ impl ReportGenerator {
         report_base_name: &str,
     ) -> Result<PathBuf> {
         fs::create_dir_all(&self.output_dir)?;
-        
-        let report_path = self.output_dir.join(format!("{}_report.json", report_base_name));
+
+        let report_path = self
+            .output_dir
+            .join(format!("{}_report.json", report_base_name));
         let mut file = File::create(&report_path)?;
         file.write_all(serde_json::to_string_pretty(report)?.as_bytes())?;
-        
+
         info!("Report saved: {}", report_path.display());
-        
+
         Ok(report_path)
     }
 }

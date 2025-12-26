@@ -123,8 +123,8 @@ pub(crate) fn preprocess_unknown_values(df: DataFrame) -> Result<DataFrame> {
 
     // Define all possible forms of UNKNOWN/ERROR (case-insensitive)
     let unknown_patterns: HashSet<String> = [
-        "unknown", "error", "n/a", "na", "null", "none", "missing", "nan", "#n/a", "#error",
-        "", " ", "  ", // Empty and whitespace
+        "unknown", "error", "n/a", "na", "null", "none", "missing", "nan", "#n/a", "#error", "",
+        " ", "  ", // Empty and whitespace
     ]
     .iter()
     .map(|s| s.to_lowercase())
@@ -136,8 +136,7 @@ pub(crate) fn preprocess_unknown_values(df: DataFrame) -> Result<DataFrame> {
         if let Ok(col) = df.column(col_name) {
             let series = col.as_materialized_series();
             if series.dtype() == &DataType::String {
-                let (cleaned_series, count) =
-                    replace_unknown_with_null(series, &unknown_patterns)?;
+                let (cleaned_series, count) = replace_unknown_with_null(series, &unknown_patterns)?;
                 if count > 0 {
                     total_replacements += count;
                     df.replace(col_name, cleaned_series)?;

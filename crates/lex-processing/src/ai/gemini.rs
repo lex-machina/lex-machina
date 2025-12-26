@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::types::DecisionQuestion;
 
 use super::AIProvider;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -300,9 +300,10 @@ impl GeminiProvider {
             .and_then(|c| {
                 // Check if response was blocked
                 if let Some(reason) = &c.finish_reason
-                    && (reason == "SAFETY" || reason == "BLOCKED") {
-                        return None;
-                    }
+                    && (reason == "SAFETY" || reason == "BLOCKED")
+                {
+                    return None;
+                }
                 c.content.as_ref()
             })
             .and_then(|content| content.parts.as_ref())
@@ -590,7 +591,13 @@ mod tests {
 
         let response: GeminiResponse = serde_json::from_str(json).unwrap();
         let candidates = response.candidates.unwrap();
-        let parts = candidates[0].content.as_ref().unwrap().parts.as_ref().unwrap();
+        let parts = candidates[0]
+            .content
+            .as_ref()
+            .unwrap()
+            .parts
+            .as_ref()
+            .unwrap();
         assert_eq!(parts.len(), 2);
         assert_eq!(parts[0].text, "First part");
         assert_eq!(parts[1].text, "Second part");
@@ -605,7 +612,9 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("classification", &question).unwrap();
+        let result = provider
+            .extract_decision("classification", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -614,7 +623,9 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("CLASSIFICATION", &question).unwrap();
+        let result = provider
+            .extract_decision("CLASSIFICATION", &question)
+            .unwrap();
         assert_eq!(result, "classification");
 
         let result = provider.extract_decision("Regression", &question).unwrap();
@@ -626,7 +637,9 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("[classification]", &question).unwrap();
+        let result = provider
+            .extract_decision("[classification]", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -635,10 +648,14 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("\"classification\"", &question).unwrap();
+        let result = provider
+            .extract_decision("\"classification\"", &question)
+            .unwrap();
         assert_eq!(result, "classification");
 
-        let result = provider.extract_decision("'regression'", &question).unwrap();
+        let result = provider
+            .extract_decision("'regression'", &question)
+            .unwrap();
         assert_eq!(result, "regression");
     }
 
@@ -647,7 +664,9 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         let question = create_classification_question();
 
-        let result = provider.extract_decision("  classification  ", &question).unwrap();
+        let result = provider
+            .extract_decision("  classification  ", &question)
+            .unwrap();
         assert_eq!(result, "classification");
     }
 
@@ -810,9 +829,7 @@ mod tests {
         let provider = GeminiProvider::new("test-key").unwrap();
         assert_eq!(provider.model(), Some(DEFAULT_MODEL));
 
-        let config = GeminiConfig::builder()
-            .model("custom-model")
-            .build();
+        let config = GeminiConfig::builder().model("custom-model").build();
         let provider = GeminiProvider::with_config("test-key", config).unwrap();
         assert_eq!(provider.model(), Some("custom-model"));
     }
