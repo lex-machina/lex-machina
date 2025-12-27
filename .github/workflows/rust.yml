@@ -16,7 +16,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: setup
-              run: rustup default nightly && rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+              run: rustup default nightly && rustup component add rustc-codegen-cranelift-preview --toolchain nightly && apt install clang
             - name: Build
               run: cargo build --verbose
             - name: Run tests
