@@ -19,6 +19,8 @@ export interface ColumnSelectorProps {
   onSelectionChange: (selectedColumns: string[]) => void;
   /** Whether the selector is disabled (e.g., during processing) */
   disabled?: boolean;
+  /** Hide the internal header (use when embedding in a panel with its own header) */
+  hideHeader?: boolean;
   /** Additional class names */
   className?: string;
 }
@@ -51,37 +53,11 @@ function getDtypeLabel(dtype: string): string {
 
 /**
  * Get badge color based on dtype category.
+ * Uses muted, subtle colors to fit with the rest of the app.
  */
-function getDtypeBadgeClass(dtype: string): string {
-  const dtypeLower = dtype.toLowerCase();
-
-  // Numeric types - blue
-  if (dtypeLower.includes("int") || dtypeLower.includes("float") || dtypeLower.includes("f64") || dtypeLower.includes("f32")) {
-    return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-  }
-
-  // String types - green
-  if (dtypeLower.includes("str") || dtypeLower.includes("utf8") || dtypeLower.includes("string")) {
-    return "bg-green-500/20 text-green-400 border-green-500/30";
-  }
-
-  // Boolean - purple
-  if (dtypeLower.includes("bool")) {
-    return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-  }
-
-  // Date/Time types - orange
-  if (dtypeLower.includes("date") || dtypeLower.includes("time") || dtypeLower.includes("duration")) {
-    return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-  }
-
-  // Categorical - yellow
-  if (dtypeLower.includes("categorical") || dtypeLower.includes("cat")) {
-    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-  }
-
-  // Null/Unknown - gray
-  return "bg-muted text-muted-foreground border-border";
+function getDtypeBadgeClass(): string {
+  // Use consistent muted styling for all types
+  return "bg-muted text-muted-foreground";
 }
 
 // ============================================================================
@@ -104,14 +80,14 @@ function ColumnItem({ column, isSelected, onToggle, disabled }: ColumnItemProps)
   );
 
   const dtypeLabel = getDtypeLabel(column.dtype);
-  const dtypeBadgeClass = getDtypeBadgeClass(column.dtype);
+  const dtypeBadgeClass = getDtypeBadgeClass();
   const hasNulls = column.null_count > 0;
 
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md",
-        "hover:bg-accent/50 transition-colors",
+        "flex items-center gap-2 px-2 py-1.5 rounded",
+        "hover:bg-muted/50 transition-colors",
         disabled && "opacity-50 pointer-events-none"
       )}
     >
@@ -123,30 +99,88 @@ function ColumnItem({ column, isSelected, onToggle, disabled }: ColumnItemProps)
       />
 
       {/* Column name */}
-      <span className="flex-1 text-sm font-medium truncate" title={column.name}>
+      <span className="flex-1 text-sm truncate" title={column.name}>
         {column.name}
       </span>
 
       {/* Null count indicator */}
       {hasNulls && (
         <span
-          className="text-xs text-muted-foreground tabular-nums"
+          className="text-xs text-muted-foreground tabular-nums shrink-0"
           title={`${column.null_count} null values`}
         >
-          {column.null_count} nulls
+          {column.null_count}
         </span>
       )}
 
       {/* Data type badge */}
       <span
         className={cn(
-          "px-1.5 py-0.5 text-xs font-mono rounded border",
+          "px-1.5 py-0.5 text-xs rounded shrink-0",
           dtypeBadgeClass
         )}
         title={`Data type: ${column.dtype}`}
       >
         {dtypeLabel}
       </span>
+    </div>
+  );
+}
+
+// ============================================================================
+// COLUMN SELECTOR HEADER COMPONENT
+// ============================================================================
+
+export interface ColumnSelectorHeaderProps {
+  /** Total number of columns */
+  totalCount: number;
+  /** Number of selected columns */
+  selectedCount: number;
+  /** Callback to select all columns */
+  onSelectAll: () => void;
+  /** Callback to deselect all columns */
+  onDeselectAll: () => void;
+  /** Whether the controls are disabled */
+  disabled?: boolean;
+}
+
+/**
+ * A standalone header component with selection count and All/None buttons.
+ * Use this when you want to place the controls in a custom header.
+ */
+export function ColumnSelectorHeader({
+  totalCount,
+  selectedCount,
+  onSelectAll,
+  onDeselectAll,
+  disabled = false,
+}: ColumnSelectorHeaderProps) {
+  const allSelected = totalCount > 0 && selectedCount === totalCount;
+  const noneSelected = selectedCount === 0;
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {selectedCount}/{totalCount}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onSelectAll}
+        disabled={disabled || allSelected}
+        className="h-5 px-1.5 text-xs"
+      >
+        All
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onDeselectAll}
+        disabled={disabled || noneSelected}
+        className="h-5 px-1.5 text-xs"
+      >
+        None
+      </Button>
     </div>
   );
 }
@@ -178,6 +212,7 @@ export function ColumnSelector({
   selectedColumns,
   onSelectionChange,
   disabled = false,
+  hideHeader = false,
   className,
 }: ColumnSelectorProps) {
   // Create a Set for O(1) lookup
@@ -229,33 +264,37 @@ export function ColumnSelector({
 
   return (
     <div className={cn("flex flex-col", className)} data-slot="column-selector">
-      {/* Header with actions */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-sm text-muted-foreground">
-          {selectedCount} of {totalCount} selected
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSelectAll}
-            disabled={disabled || allSelected}
-          >
-            Select All
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDeselectAll}
-            disabled={disabled || noneSelected}
-          >
-            Deselect All
-          </Button>
+      {/* Header with actions - only shown if not hidden */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+          <span className="text-xs text-muted-foreground">
+            {selectedCount}/{totalCount}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSelectAll}
+              disabled={disabled || allSelected}
+              className="h-6 px-2 text-xs"
+            >
+              All
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeselectAll}
+              disabled={disabled || noneSelected}
+              className="h-6 px-2 text-xs"
+            >
+              None
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Column list */}
-      <div className="flex flex-col overflow-y-auto max-h-[400px]">
+      {/* Column list - fills available space with internal scroll */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-y-auto px-1">
         {columns.map((column) => (
           <ColumnItem
             key={column.name}
@@ -265,26 +304,6 @@ export function ColumnSelector({
             disabled={disabled}
           />
         ))}
-      </div>
-
-      {/* Footer with summary */}
-      <div className="flex items-center gap-4 px-3 py-2 border-t border-border text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500/50" />
-          Numeric
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500/50" />
-          String
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-orange-500/50" />
-          Date/Time
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-purple-500/50" />
-          Boolean
-        </span>
       </div>
     </div>
   );

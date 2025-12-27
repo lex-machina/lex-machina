@@ -31,9 +31,11 @@
 //! │  │ - provider: AIProviderType │ │  │ (thread-safe cancel)       │           │
 //! │  │ - api_key: String          │ │  └────────────────────────────┘           │
 //! │  └────────────────────────────┘ │                                           │
-//! ├─────────────────────────────────┴───────────────────────────────────────────┤
-//! │  theme: RwLock<Theme>  (System | Light | Dark)                              │
-//! └─────────────────────────────────────────────────────────────────────────────┘
+//! ├─────────────────────────────────┼───────────────────────────────────────────┤
+//! │  last_preprocessing_result:     │  theme: RwLock<Theme>                     │
+//! │  RwLock<Option<Summary>>        │  (System | Light | Dark)                  │
+//! │  (persists across navigation)   │                                           │
+//! └─────────────────────────────────┴───────────────────────────────────────────┘
 //! ```
 //!
 //! # Thread Safety
@@ -387,6 +389,7 @@ pub const MAX_HISTORY_ENTRIES: usize = 10;
 /// * `preprocessing_token` - Cancellation token for running preprocessing
 /// * `preprocessing_history` - History of preprocessing runs (max 10, session-only)
 /// * `processed_dataframe` - The most recent preprocessed DataFrame
+/// * `last_preprocessing_result` - Summary from the most recent preprocessing run
 /// * `theme` - Application theme setting
 pub struct AppState {
     /// Currently loaded `DataFrame` with metadata.
@@ -415,6 +418,11 @@ pub struct AppState {
     /// `None` until preprocessing is run, then contains the cleaned data.
     pub processed_dataframe: RwLock<Option<LoadedDataFrame>>,
 
+    /// Summary from the most recent preprocessing run.
+    /// Persists across navigation until user dismisses or starts new run.
+    /// Separate from history - dismissing this doesn't clear history.
+    pub last_preprocessing_result: RwLock<Option<PreprocessingSummary>>,
+
     /// Application theme setting (System, Light, or Dark).
     /// Defaults to System (follows OS preference).
     pub theme: RwLock<Theme>,
@@ -430,6 +438,7 @@ impl AppState {
             preprocessing_token: RwLock::new(CancellationToken::new()),
             preprocessing_history: RwLock::new(Vec::new()),
             processed_dataframe: RwLock::new(None),
+            last_preprocessing_result: RwLock::new(None),
             theme: RwLock::new(Theme::default()),
         }
     }

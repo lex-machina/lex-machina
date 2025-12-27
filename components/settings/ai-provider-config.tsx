@@ -1,6 +1,20 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import {
+  Layers,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  KeyRound,
+  Trash2,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Power,
+  PowerOff,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +28,16 @@ import type { ValidationStatus } from "@/lib/hooks/use-settings";
 export interface AIProviderConfigProps {
   /** Current AI provider configuration (null if not configured) */
   config: AIProviderConfig | null;
+  /** List of providers with saved API keys */
+  savedProviders: AIProviderType[];
   /** Callback to configure an AI provider */
   onConfigure: (provider: AIProviderType, apiKey: string) => Promise<void>;
-  /** Callback to clear the AI provider */
+  /** Callback to clear the active AI provider (keeps saved keys) */
   onClear: () => Promise<void>;
+  /** Callback to switch to a saved provider */
+  onSwitch: (provider: AIProviderType) => Promise<void>;
+  /** Callback to permanently delete a saved provider's key */
+  onDelete: (provider: AIProviderType) => Promise<void>;
   /** Callback to validate an API key */
   onValidate: (provider: AIProviderType, apiKey: string) => Promise<boolean>;
   /** Current validation status */
@@ -50,7 +70,7 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
     description: "Access multiple AI models through a single API",
     placeholder: "sk-or-v1-...",
     helpUrl: "https://openrouter.ai/keys",
-    icon: <OpenRouterIcon />,
+    icon: <Layers className="w-5 h-5 shrink-0" />,
   },
   {
     value: "gemini",
@@ -58,177 +78,9 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
     description: "Google's advanced AI model",
     placeholder: "AIza...",
     helpUrl: "https://aistudio.google.com/apikey",
-    icon: <GeminiIcon />,
+    icon: <Sparkles className="w-5 h-5 shrink-0" />,
   },
 ];
-
-// ============================================================================
-// ICONS
-// ============================================================================
-
-function OpenRouterIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <path d="M12 2L2 7l10 5 10-5-10-5Z" />
-      <path d="m2 17 10 5 10-5" />
-      <path d="m2 12 10 5 10-5" />
-    </svg>
-  );
-}
-
-function GeminiIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-      <path d="M12 3a6 6 0 0 1-9 9 9 9 0 1 0 9-9Z" />
-    </svg>
-  );
-}
-
-function CheckCircleIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <path d="m9 11 3 3L22 4" />
-    </svg>
-  );
-}
-
-function AlertCircleIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" x2="12" y1="8" y2="12" />
-      <line x1="12" x2="12.01" y1="16" y2="16" />
-    </svg>
-  );
-}
-
-function LoadingIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0 animate-spin"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}
-
-function KeyIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <circle cx="7.5" cy="15.5" r="5.5" />
-      <path d="m21 2-9.6 9.6" />
-      <path d="m15.5 7.5 3 3L22 7l-3-3" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0"
-    >
-      <path d="M3 6h18" />
-      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0 ml-1"
-    >
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-  );
-}
 
 // ============================================================================
 // PROVIDER CARD COMPONENT
@@ -236,65 +88,130 @@ function ExternalLinkIcon() {
 
 interface ProviderCardProps {
   option: ProviderOption;
+  isActive: boolean;
+  hasSavedKey: boolean;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onDelete: () => void;
+  onSelect: () => void;
   isSelected: boolean;
-  isConfigured: boolean;
-  onClick: () => void;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
 function ProviderCard({
   option,
+  isActive,
+  hasSavedKey,
+  onActivate,
+  onDeactivate,
+  onDelete,
+  onSelect,
   isSelected,
-  isConfigured,
-  onClick,
   disabled,
+  isLoading,
 }: ProviderCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
+    <div
       className={cn(
-        // Base styles
-        "relative flex items-center gap-3 p-3 rounded-md text-left",
+        "relative flex flex-col gap-3 p-3 rounded-md",
         "border transition-all duration-150",
-        // Focus styles
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        // Selected state
         isSelected
           ? "border-primary bg-primary/5"
-          : "border-border hover:border-muted-foreground/50 hover:bg-muted/50",
-        // Disabled state
-        disabled && "cursor-not-allowed opacity-50"
+          : "border-border",
+        disabled && "opacity-50 pointer-events-none"
       )}
     >
-      {/* Icon */}
-      <div
+      {/* Header */}
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled}
         className={cn(
-          "flex items-center justify-center w-10 h-10 rounded-md",
-          isSelected
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
+          "flex items-center gap-3 text-left w-full",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         )}
       >
-        {option.icon}
-      </div>
-
-      {/* Content */}
-      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        <span className="text-sm font-medium">{option.label}</span>
-        <span className="text-xs text-muted-foreground">
-          {option.description}
-        </span>
-      </div>
-
-      {/* Configured indicator */}
-      {isConfigured && (
-        <div className="absolute top-2 right-2 text-green-500">
-          <CheckCircleIcon />
+        {/* Icon */}
+        <div
+          className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-md",
+            isActive
+              ? "bg-primary text-primary-foreground"
+              : hasSavedKey
+                ? "bg-muted text-foreground"
+                : "bg-muted text-muted-foreground"
+          )}
+        >
+          {option.icon}
         </div>
-      )}
-    </button>
+
+        {/* Content */}
+        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+          <span className="text-sm font-medium">{option.label}</span>
+          <span className="text-xs text-muted-foreground">
+            {option.description}
+          </span>
+        </div>
+      </button>
+
+      {/* Status & Actions */}
+      <div className="flex items-center justify-between gap-2 pl-[52px]">
+        {/* Status indicators */}
+        <div className="flex items-center gap-2">
+          {isActive && (
+            <span className="flex items-center gap-1 text-xs text-primary">
+              <CheckCircle2 className="w-3 h-3" />
+              Active
+            </span>
+          )}
+          {!isActive && hasSavedKey && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <KeyRound className="w-3 h-3" />
+              Key saved
+            </span>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-1">
+          {isActive ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDeactivate}
+              disabled={isLoading}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <PowerOff className="w-3 h-3 mr-1" />
+              Deactivate
+            </Button>
+          ) : hasSavedKey ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onActivate}
+              disabled={isLoading}
+              className="h-7 px-2 text-xs text-primary hover:text-primary"
+            >
+              <Power className="w-3 h-3 mr-1" />
+              Activate
+            </Button>
+          ) : null}
+          {hasSavedKey && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              disabled={isLoading}
+              className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -312,22 +229,22 @@ function StatusIndicator({ status, error }: StatusIndicatorProps) {
 
   const config = {
     validating: {
-      icon: <LoadingIcon />,
+      icon: <Loader2 className="w-4 h-4 shrink-0 animate-spin" />,
       text: "Validating...",
       className: "text-muted-foreground",
     },
     valid: {
-      icon: <CheckCircleIcon />,
+      icon: <CheckCircle2 className="w-4 h-4 shrink-0" />,
       text: "API key is valid",
       className: "text-green-500",
     },
     invalid: {
-      icon: <AlertCircleIcon />,
+      icon: <AlertCircle className="w-4 h-4 shrink-0" />,
       text: "API key is invalid",
       className: "text-destructive",
     },
     error: {
-      icon: <AlertCircleIcon />,
+      icon: <AlertCircle className="w-4 h-4 shrink-0" />,
       text: error || "Validation failed",
       className: "text-destructive",
     },
@@ -353,35 +270,19 @@ function StatusIndicator({ status, error }: StatusIndicatorProps) {
  * Allows users to:
  * - Select an AI provider (OpenRouter or Gemini)
  * - Enter and validate their API key
- * - Save or clear the configuration
+ * - Save multiple provider keys
+ * - Switch between saved providers
+ * - Delete saved provider keys
  *
- * API keys are stored in session memory only (not persisted to disk).
- *
- * @example
- * ```tsx
- * const {
- *   aiConfig,
- *   configureAIProvider,
- *   clearAIProvider,
- *   validateAPIKey,
- *   validationStatus,
- *   validationError,
- * } = useSettings();
- *
- * <AIProviderConfig
- *   config={aiConfig}
- *   onConfigure={configureAIProvider}
- *   onClear={clearAIProvider}
- *   onValidate={validateAPIKey}
- *   validationStatus={validationStatus}
- *   validationError={validationError}
- * />
- * ```
+ * API keys are stored securely in the OS keychain.
  */
 export function AIProviderConfig({
   config,
+  savedProviders,
   onConfigure,
   onClear,
+  onSwitch,
+  onDelete,
   onValidate,
   validationStatus,
   validationError,
@@ -400,12 +301,10 @@ export function AIProviderConfig({
   useEffect(() => {
     if (config) {
       setSelectedProvider(config.provider);
-      // Don't show the actual key, just indicate it's configured
       setApiKey("");
     }
   }, [config]);
 
-  const isConfigured = config !== null && config.provider !== "none";
   const currentProviderOption = PROVIDER_OPTIONS.find(
     (p) => p.value === selectedProvider
   );
@@ -415,6 +314,36 @@ export function AIProviderConfig({
     setSelectedProvider(provider);
     setApiKey("");
   }, []);
+
+  // Handle activation (switch to saved provider)
+  const handleActivate = useCallback(async (provider: AIProviderType) => {
+    setIsSubmitting(true);
+    try {
+      await onSwitch(provider);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [onSwitch]);
+
+  // Handle deactivation (clear active provider, keep saved key)
+  const handleDeactivate = useCallback(async () => {
+    setIsSubmitting(true);
+    try {
+      await onClear();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [onClear]);
+
+  // Handle deletion (permanently remove saved key)
+  const handleDelete = useCallback(async (provider: AIProviderType) => {
+    setIsSubmitting(true);
+    try {
+      await onDelete(provider);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [onDelete]);
 
   // Handle validation
   const handleValidate = useCallback(async () => {
@@ -437,20 +366,10 @@ export function AIProviderConfig({
     }
   }, [selectedProvider, apiKey, onConfigure]);
 
-  // Handle clear
-  const handleClear = useCallback(async () => {
-    setIsSubmitting(true);
-    try {
-      await onClear();
-      setApiKey("");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [onClear]);
-
   const isLoading = isSubmitting || validationStatus === "validating";
   const canSave = apiKey.trim().length > 0 && !isLoading;
   const canValidate = apiKey.trim().length > 0 && !isLoading;
+  const selectedHasSavedKey = savedProviders.includes(selectedProvider);
 
   return (
     <div
@@ -461,54 +380,29 @@ export function AIProviderConfig({
       )}
       data-slot="ai-provider-config"
     >
-      {/* Current Status Banner */}
-      {isConfigured && (
-        <div className="flex items-center justify-between p-3 rounded-md bg-green-500/10 border border-green-500/20">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/20 text-green-500">
-              <CheckCircleIcon />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">
-                {PROVIDER_OPTIONS.find((p) => p.value === config?.provider)?.label} configured
-              </span>
-              <span className="text-xs text-muted-foreground">
-                AI-guided preprocessing is available
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            disabled={isLoading}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          >
-            <TrashIcon />
-            Remove
-          </Button>
-        </div>
-      )}
-
       {/* Provider Selection */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">
-            {isConfigured ? "Change Provider" : "Select Provider"}
-          </h3>
+          <h3 className="text-sm font-medium">AI Providers</h3>
           <p className="text-xs text-muted-foreground">
-            Choose an AI provider for intelligent preprocessing decisions
+            Configure AI providers for intelligent preprocessing decisions.
+            You can save keys for multiple providers and switch between them.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-2">
           {PROVIDER_OPTIONS.map((option) => (
             <ProviderCard
               key={option.value}
               option={option}
+              isActive={config?.provider === option.value}
+              hasSavedKey={savedProviders.includes(option.value)}
+              onActivate={() => handleActivate(option.value)}
+              onDeactivate={handleDeactivate}
+              onDelete={() => handleDelete(option.value)}
+              onSelect={() => handleProviderSelect(option.value)}
               isSelected={selectedProvider === option.value}
-              isConfigured={config?.provider === option.value}
-              onClick={() => handleProviderSelect(option.value)}
-              disabled={disabled || isLoading}
+              disabled={disabled}
+              isLoading={isLoading}
             />
           ))}
         </div>
@@ -518,11 +412,13 @@ export function AIProviderConfig({
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium">API Key</h3>
+            <h3 className="text-sm font-medium">
+              {selectedHasSavedKey ? "Update API Key" : "Add API Key"}
+            </h3>
             <p className="text-xs text-muted-foreground">
-              {isConfigured && config?.provider === selectedProvider
-                ? "Enter a new key to update your configuration"
-                : `Enter your ${currentProviderOption?.label} API key`}
+              {selectedHasSavedKey
+                ? `Enter a new key to update your ${currentProviderOption?.label} configuration`
+                : `Enter your ${currentProviderOption?.label} API key to enable AI-guided preprocessing`}
             </p>
           </div>
           {currentProviderOption && (
@@ -533,7 +429,7 @@ export function AIProviderConfig({
               className="text-xs text-primary hover:underline flex items-center"
             >
               Get API key
-              <ExternalLinkIcon />
+              <ExternalLink className="w-3 h-3 shrink-0 ml-1" />
             </a>
           )}
         </div>
@@ -545,7 +441,7 @@ export function AIProviderConfig({
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={currentProviderOption?.placeholder}
             disabled={disabled || isLoading}
-            leftAddon={<KeyIcon />}
+            leftAddon={<KeyRound className="w-4 h-4 shrink-0" />}
             rightAddon={
               <button
                 type="button"
@@ -553,7 +449,7 @@ export function AIProviderConfig({
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 tabIndex={-1}
               >
-                {showKey ? <EyeOffIcon /> : <EyeIcon />}
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             }
           />
@@ -572,7 +468,7 @@ export function AIProviderConfig({
           >
             {validationStatus === "validating" ? (
               <>
-                <LoadingIcon />
+                <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
                 Validating...
               </>
             ) : (
@@ -586,68 +482,24 @@ export function AIProviderConfig({
           >
             {isSubmitting ? (
               <>
-                <LoadingIcon />
+                <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
                 Saving...
               </>
-            ) : isConfigured && config?.provider === selectedProvider ? (
+            ) : selectedHasSavedKey ? (
               "Update Key"
             ) : (
-              "Save Configuration"
+              "Save Key"
             )}
           </Button>
         </div>
 
         {/* Security Notice */}
         <p className="text-xs text-muted-foreground mt-2">
-          Your API key is stored in memory only and will be cleared when you close the application.
-          It is never saved to disk or sent anywhere except to the selected AI provider.
+          Your API keys are stored securely in your operating system&apos;s keychain
+          and persist across app restarts. They are never sent anywhere except to the selected AI provider.
         </p>
       </div>
     </div>
-  );
-}
-
-// ============================================================================
-// ADDITIONAL ICONS
-// ============================================================================
-
-function EyeIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function EyeOffIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
-      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
-      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
-      <path d="m2 2 20 20" />
-    </svg>
   );
 }
 

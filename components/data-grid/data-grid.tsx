@@ -1,10 +1,78 @@
 "use client";
 
+import { useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Table2, FileUp, Columns, Search, Download } from "lucide-react";
+
 import { useGridData } from "@/components/data-grid/use-grid-data";
 import { useGridScroll, SCROLLBAR_SIZE } from "@/components/data-grid/use-grid-scroll";
 import GridHeader from "@/components/data-grid/grid-header";
 import GridBody from "@/components/data-grid/grid-body";
 import Scrollbar from "@/components/ui/scrollbar";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
+import type { FileInfo } from "@/types";
+
+/**
+ * Empty state component shown when no file is loaded.
+ * Provides informative content about page features and an action to import data.
+ */
+function NoFileLoadedState() {
+  const handleImport = useCallback(async () => {
+    try {
+      const filePath = await invoke<string | null>("open_file_dialog");
+      if (!filePath) return;
+
+      await invoke<FileInfo>("load_file", { path: filePath });
+      toast.success("File loaded successfully");
+    } catch (err) {
+      toast.error(`Failed to import file: ${err}`);
+    }
+  }, []);
+
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center max-w-md">
+        {/* Icon */}
+        <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
+          <Table2 className="w-8 h-8 text-muted-foreground" />
+        </div>
+
+        {/* Title and description */}
+        <h2 className="text-xl font-semibold mb-2">Data Viewer</h2>
+        <p className="text-muted-foreground mb-6">
+          Import a CSV file to explore and analyze your data with a high-performance grid.
+        </p>
+
+        {/* Features */}
+        <ul className="text-sm text-muted-foreground space-y-2 mb-8 text-left">
+          <li className="flex items-center gap-3">
+            <FileUp className="w-4 h-4 shrink-0" />
+            <span>Import CSV files of any size</span>
+          </li>
+          <li className="flex items-center gap-3">
+            <Columns className="w-4 h-4 shrink-0" />
+            <span>Resizable columns with type detection</span>
+          </li>
+          <li className="flex items-center gap-3">
+            <Search className="w-4 h-4 shrink-0" />
+            <span>Virtual scrolling for large datasets</span>
+          </li>
+          <li className="flex items-center gap-3">
+            <Download className="w-4 h-4 shrink-0" />
+            <span>Export processed data to CSV</span>
+          </li>
+        </ul>
+
+        {/* Action button */}
+        <Button onClick={handleImport} size="lg">
+          <FileUp className="w-4 h-4 mr-2" />
+          Import File
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * DataGrid - A self-contained virtualized data grid component.
@@ -60,13 +128,9 @@ const DataGrid = () => {
     onVisibleRangeChange: fetchRows,
   });
 
-  // Empty state
+  // Empty state - show enhanced empty state with features
   if (!hasData) {
-    return (
-      <div className="flex-1 justify-center items-center flex">
-        <p className="text-muted-foreground">Upload a file to get started</p>
-      </div>
-    );
+    return <NoFileLoadedState />;
   }
 
   return (

@@ -37,6 +37,8 @@ export interface SettingsState {
   hasAIProvider: boolean;
   /** Current AI provider type (for display) */
   aiProviderType: AIProviderType;
+  /** List of providers that have saved API keys in the keychain */
+  savedProviders: AIProviderType[];
   /** Whether settings are being loaded */
   isLoading: boolean;
   /** Validation status for the current API key */
@@ -84,10 +86,40 @@ export interface SettingsActions {
   ) => Promise<void>;
 
   /**
-   * Clears the AI provider configuration.
-   * After calling this, preprocessing will use rule-based decisions only.
+   * Clears the active AI provider configuration.
+   * The API key remains saved in the keychain for later reactivation.
+   * Use `deleteSavedProvider` to permanently remove a saved key.
    */
   clearAIProvider: () => Promise<void>;
+
+  /**
+   * Switches to a provider that has a saved API key.
+   *
+   * @param provider - The provider to switch to (must have a saved key)
+   * @returns Promise that resolves on success or rejects if no key is saved
+   *
+   * @example
+   * ```tsx
+   * // Switch to a previously saved provider
+   * if (savedProviders.includes("gemini")) {
+   *   await switchProvider("gemini");
+   * }
+   * ```
+   */
+  switchProvider: (provider: AIProviderType) => Promise<void>;
+
+  /**
+   * Permanently deletes a saved API key from the keychain.
+   *
+   * @param provider - The provider whose key should be deleted
+   *
+   * @example
+   * ```tsx
+   * // Remove the saved OpenRouter key
+   * await deleteSavedProvider("openrouter");
+   * ```
+   */
+  deleteSavedProvider: (provider: AIProviderType) => Promise<void>;
 
   /**
    * Validates an API key without saving it.
@@ -175,13 +207,17 @@ export type UseSettingsReturn = SettingsState & SettingsActions;
  * Following "Rust Supremacy", all settings are stored and managed in Rust.
  * This hook handles IPC communication and local UI state.
  *
- * API keys are stored in session memory only (not persisted to disk)
- * for security reasons.
+ * **Persistence:**
+ * - Theme and sidebar width are stored in a JSON settings file
+ * - API keys are stored securely in the OS keychain (Keychain on macOS,
+ *   Credential Manager on Windows, Secret Service on Linux)
+ * - Settings persist across app restarts
  */
 export function useSettings(): UseSettingsReturn {
   // State
   const [theme, setThemeState] = useState<Theme>("system");
   const [aiConfig, setAIConfig] = useState<AIProviderConfig | null>(null);
+  const [savedProviders, setSavedProviders] = useState<AIProviderType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>("idle");
@@ -201,13 +237,15 @@ export function useSettings(): UseSettingsReturn {
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [fetchedTheme, fetchedAIConfig] = await Promise.all([
+      const [fetchedTheme, fetchedAIConfig, fetchedSavedProviders] = await Promise.all([
         invoke<Theme>("get_theme"),
         invoke<AIProviderConfig | null>("get_ai_provider_config"),
+        invoke<AIProviderType[]>("get_saved_providers"),
       ]);
 
       setThemeState(fetchedTheme);
       setAIConfig(fetchedAIConfig);
+      setSavedProviders(fetchedSavedProviders);
     } catch (err) {
       console.error("Failed to fetch settings:", err);
     } finally {
@@ -245,6 +283,10 @@ export function useSettings(): UseSettingsReturn {
         await invoke("configure_ai_provider", { provider, apiKey });
         // Update local state
         setAIConfig({ provider, api_key: apiKey });
+        // Add to saved providers if not already there
+        setSavedProviders((prev) =>
+          prev.includes(provider) ? prev : [...prev, provider]
+        );
         setValidationStatus("valid");
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -256,7 +298,8 @@ export function useSettings(): UseSettingsReturn {
   );
 
   /**
-   * Clears the AI provider configuration.
+   * Clears the active AI provider configuration.
+   * Keys remain saved in the keychain.
    */
   const clearAIProvider = useCallback(async () => {
     try {
@@ -266,6 +309,42 @@ export function useSettings(): UseSettingsReturn {
       setValidationError(null);
     } catch (err) {
       console.error("Failed to clear AI provider:", err);
+      throw err;
+    }
+  }, []);
+
+  /**
+   * Switches to a provider that has a saved API key.
+   */
+  const switchProvider = useCallback(async (provider: AIProviderType) => {
+    try {
+      await invoke("switch_ai_provider", { provider });
+      // Refresh to get the new config with masked key
+      const newConfig = await invoke<AIProviderConfig | null>("get_ai_provider_config");
+      setAIConfig(newConfig);
+      setValidationStatus("valid");
+      setValidationError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Failed to switch provider:", err);
+      throw new Error(message);
+    }
+  }, []);
+
+  /**
+   * Permanently deletes a saved API key.
+   */
+  const deleteSavedProvider = useCallback(async (provider: AIProviderType) => {
+    try {
+      await invoke("delete_saved_provider", { provider });
+      // Remove from saved providers list
+      setSavedProviders((prev) => prev.filter((p) => p !== provider));
+      // If this was the active provider, clear the config
+      setAIConfig((prev) => (prev?.provider === provider ? null : prev));
+      setValidationStatus("idle");
+      setValidationError(null);
+    } catch (err) {
+      console.error("Failed to delete saved provider:", err);
       throw err;
     }
   }, []);
@@ -344,6 +423,7 @@ export function useSettings(): UseSettingsReturn {
     aiConfig,
     hasAIProvider,
     aiProviderType,
+    savedProviders,
     isLoading,
     validationStatus,
     validationError,
@@ -352,6 +432,8 @@ export function useSettings(): UseSettingsReturn {
     setTheme,
     configureAIProvider,
     clearAIProvider,
+    switchProvider,
+    deleteSavedProvider,
     validateAPIKey,
     refresh,
   };

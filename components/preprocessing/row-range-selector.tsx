@@ -236,7 +236,12 @@ export function RowRangeSelector({
       </div>
 
       {/* Summary */}
-      <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+      <div
+        className={cn(
+          "flex items-center justify-between px-1 text-xs text-muted-foreground transition-opacity",
+          !isEnabled && "opacity-50"
+        )}
+      >
         <span>
           {isEnabled ? (
             <>
@@ -252,7 +257,12 @@ export function RowRangeSelector({
       </div>
 
       {/* Visual indicator bar */}
-      <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+      <div
+        className={cn(
+          "h-2 w-full rounded-full bg-secondary overflow-hidden transition-opacity",
+          !isEnabled && "opacity-50"
+        )}
+      >
         {isEnabled ? (
           <div
             className="h-full bg-primary transition-all"

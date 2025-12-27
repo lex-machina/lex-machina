@@ -42,17 +42,18 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Local;
 use lex_processing::{
     Pipeline, PipelineConfig, PipelineResult, PreprocessingError, ProgressReporter, ProgressUpdate,
+    ai::{AIProvider, GeminiProvider, OpenRouterProvider},
 };
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Number, Value};
+use serde_json::{Number, Value, json};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::events::AppEventEmitter;
 use crate::state::{
-    AppState, ColumnInfo, FileInfo, LoadedDataFrame, PreprocessingConfigSnapshot,
-    PreprocessingHistoryEntry, MAX_HISTORY_ENTRIES,
+    AIProviderType, AppState, ColumnInfo, FileInfo, LoadedDataFrame, MAX_HISTORY_ENTRIES,
+    PreprocessingConfigSnapshot, PreprocessingHistoryEntry,
 };
 
 // ============================================================================
@@ -164,7 +165,7 @@ fn convert_config(req: &PipelineConfigRequest) -> Result<PipelineConfig, Preproc
             return Err(PreprocessingError::InvalidConfig(format!(
                 "Unknown outlier strategy: {}",
                 other
-            )))
+            )));
         }
     };
 
@@ -178,7 +179,7 @@ fn convert_config(req: &PipelineConfigRequest) -> Result<PipelineConfig, Preproc
             return Err(PreprocessingError::InvalidConfig(format!(
                 "Unknown numeric imputation: {}",
                 other
-            )))
+            )));
         }
     };
 
@@ -190,7 +191,7 @@ fn convert_config(req: &PipelineConfigRequest) -> Result<PipelineConfig, Preproc
             return Err(PreprocessingError::InvalidConfig(format!(
                 "Unknown categorical imputation: {}",
                 other
-            )))
+            )));
         }
     };
 
@@ -311,12 +312,22 @@ impl ProgressReporter for TauriProgressReporter {
 /// - `preprocessing:complete` - On successful completion
 /// - `preprocessing:error` - On failure
 /// - `preprocessing:cancelled` - If cancelled by user
+///
+/// # State Changes
+///
+/// - Clears `last_preprocessing_result` before starting
+/// - Stores summary in `last_preprocessing_result` on completion
+/// - Stores processed DataFrame in `processed_dataframe` on completion
+/// - Adds entry to `preprocessing_history` on completion
 #[tauri::command]
 pub async fn start_preprocessing(
     app: AppHandle,
     request: PreprocessingRequest,
     state: State<'_, AppState>,
 ) -> Result<PipelineResult, PreprocessingError> {
+    // Clear previous result before starting new preprocessing
+    *state.last_preprocessing_result.write() = None;
+
     // Get the source DataFrame
     let (source_df, original_path) = {
         let guard = state.dataframe.read();
@@ -351,6 +362,9 @@ pub async fn start_preprocessing(
         token
     };
 
+    // Get AI provider config if available (read before spawn_blocking)
+    let ai_provider_config = state.ai_provider_config.read().clone();
+
     // Create progress reporter
     let reporter = Arc::new(TauriProgressReporter::new(app.clone()));
 
@@ -362,10 +376,38 @@ pub async fn start_preprocessing(
 
     // Run pipeline in blocking task (CPU-bound work)
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let pipeline = Pipeline::builder()
+        // Create AI provider if configured and AI decisions are enabled
+        let ai_provider: Option<Arc<dyn AIProvider>> = if config.use_ai_decisions {
+            ai_provider_config.and_then(|cfg| {
+                match cfg.provider {
+                    AIProviderType::OpenRouter => {
+                        OpenRouterProvider::new(&cfg.api_key)
+                            .ok()
+                            .map(|p| Arc::new(p) as Arc<dyn AIProvider>)
+                    }
+                    AIProviderType::Gemini => {
+                        GeminiProvider::new(&cfg.api_key)
+                            .ok()
+                            .map(|p| Arc::new(p) as Arc<dyn AIProvider>)
+                    }
+                    AIProviderType::None => None,
+                }
+            })
+        } else {
+            None
+        };
+
+        // Build pipeline with optional AI provider
+        let mut builder = Pipeline::builder()
             .config(config)
             .progress_reporter(reporter as Arc<dyn ProgressReporter>)
-            .cancellation_token(token)
+            .cancellation_token(token);
+
+        if let Some(provider) = ai_provider {
+            builder = builder.ai_provider(provider);
+        }
+
+        let pipeline = builder
             .build()
             .map_err(|e| PreprocessingError::InvalidConfig(e.to_string()))?;
         pipeline.process(df)
@@ -386,8 +428,11 @@ pub async fn start_preprocessing(
                 *state.processed_dataframe.write() = Some(loaded);
             }
 
-            // Create history entry
+            // Store summary and create history entry
             if let Some(ref summary) = pipeline_result.summary {
+                // Store as last result (persists across navigation)
+                *state.last_preprocessing_result.write() = Some(summary.clone());
+
                 let config_for_snapshot = convert_config(&config_clone)?;
                 let mut config_snapshot = PreprocessingConfigSnapshot::from(&config_for_snapshot);
                 config_snapshot.selected_columns = selected_columns;
@@ -459,9 +504,7 @@ pub fn cancel_preprocessing(state: State<'_, AppState>) {
 ///
 /// Vector of history entries, newest first.
 #[tauri::command]
-pub fn get_preprocessing_history(
-    state: State<'_, AppState>,
-) -> Vec<PreprocessingHistoryEntry> {
+pub fn get_preprocessing_history(state: State<'_, AppState>) -> Vec<PreprocessingHistoryEntry> {
     state.preprocessing_history.read().clone()
 }
 
@@ -503,14 +546,14 @@ pub fn clear_preprocessing_history(state: State<'_, AppState>) {
 #[tauri::command]
 pub fn load_history_entry(entry_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let history = state.preprocessing_history.read();
-    
+
     // Check if the entry exists
     let entry_exists = history.iter().any(|entry| entry.id == entry_id);
-    
+
     if !entry_exists {
         return Err(format!("History entry '{}' not found", entry_id));
     }
-    
+
     // Note: Currently we don't store the processed DataFrame in history entries
     // because it would be very memory intensive. To load a previous result,
     // we would need to re-run preprocessing with the stored config.
@@ -606,6 +649,65 @@ pub fn get_processed_rows(
 #[tauri::command]
 pub fn clear_processed_data(state: State<'_, AppState>) {
     *state.processed_dataframe.write() = None;
+}
+
+/// Gets the last preprocessing result summary.
+///
+/// This returns the summary from the most recent preprocessing run.
+/// The result persists across navigation until the user dismisses it
+/// or starts a new preprocessing run.
+///
+/// # Parameters
+///
+/// - `state` - Tauri-managed application state
+///
+/// # Returns
+///
+/// - `Some(PreprocessingSummary)` if a preprocessing result exists
+/// - `None` if no preprocessing has been done or result was dismissed
+///
+/// # Frontend Usage
+///
+/// ```typescript
+/// // Load on component mount to restore persisted result
+/// useEffect(() => {
+///   invoke<PreprocessingSummary | null>("get_last_preprocessing_result")
+///     .then((result) => {
+///       if (result) {
+///         setSummary(result);
+///         setStatus("completed");
+///       }
+///     });
+/// }, []);
+/// ```
+#[tauri::command]
+pub fn get_last_preprocessing_result(
+    state: State<'_, AppState>,
+) -> Option<lex_processing::PreprocessingSummary> {
+    state.last_preprocessing_result.read().clone()
+}
+
+/// Clears the last preprocessing result.
+///
+/// Call this when the user dismisses the results panel.
+/// This does NOT clear the preprocessing history or the processed DataFrame.
+///
+/// # Parameters
+///
+/// - `state` - Tauri-managed application state
+///
+/// # Frontend Usage
+///
+/// ```typescript
+/// const handleDismiss = async () => {
+///   await invoke("clear_last_preprocessing_result");
+///   setSummary(null);
+///   setStatus("idle");
+/// };
+/// ```
+#[tauri::command]
+pub fn clear_last_preprocessing_result(state: State<'_, AppState>) {
+    *state.last_preprocessing_result.write() = None;
 }
 
 // ============================================================================
@@ -727,12 +829,8 @@ pub async fn export_processed_data(
         let original_guard = state.dataframe.read();
         let history_guard = state.preprocessing_history.read();
 
-        let processed_info = processed_guard
-            .as_ref()
-            .map(|l| &l.file_info);
-        let original_info = original_guard
-            .as_ref()
-            .map(|l| &l.file_info);
+        let processed_info = processed_guard.as_ref().map(|l| &l.file_info);
+        let original_info = original_guard.as_ref().map(|l| &l.file_info);
         let latest_summary = history_guard.first().map(|e| &e.summary);
 
         json!({

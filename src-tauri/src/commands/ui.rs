@@ -27,7 +27,7 @@
 //! then persists to Rust when the drag ends. This gives smooth UX while
 //! keeping Rust as the source of truth.
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::state::{AppState, GridScrollPosition, UIState};
 
@@ -67,10 +67,12 @@ pub fn get_ui_state(state: State<'_, AppState>) -> UIState {
 /// Update the sidebar width.
 ///
 /// Called when the user finishes dragging the sidebar resize handle.
+/// The width is persisted to the settings store for restoration on next launch.
 ///
 /// # Parameters
 ///
 /// - `width` - New sidebar width in pixels
+/// - `app` - Tauri AppHandle for accessing the settings store
 /// - `state` - Tauri-managed application state
 ///
 /// # Frontend Usage
@@ -82,13 +84,20 @@ pub fn get_ui_state(state: State<'_, AppState>) -> UIState {
 ///
 /// # Note
 ///
-/// This command doesn't return anything - it's fire-and-forget.
-/// The frontend has already updated it's local state for instant
-/// visual feedback; this call just persists to Rust.
+/// This command persists the width to disk. The frontend has already updated
+/// its local state for instant visual feedback; this call persists to Rust
+/// and the settings store.
 #[tauri::command]
-pub fn set_sidebar_width(width: f32, state: State<'_, AppState>) {
+pub fn set_sidebar_width(width: f32, app: AppHandle, state: State<'_, AppState>) {
+    // Update in-memory state
     let mut guard = state.ui_state.write();
     guard.sidebar_width = width;
+    drop(guard); // Release lock before IO
+
+    // Persist to settings store (best effort - don't fail the command)
+    if let Err(e) = super::settings::persist_sidebar_width(&app, width) {
+        log::warn!("Failed to persist sidebar width: {}", e);
+    }
 }
 
 /// Updates a single column's width.

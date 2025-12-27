@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2, CheckCircle2, XCircle, StopCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ProgressBar, StageProgress } from "@/components/ui/progress-bar";
@@ -76,11 +77,11 @@ function formatElapsedTime(elapsedMs: number): string {
 function getStatusColorClass(status: PreprocessingStatus): string {
   switch (status) {
     case "completed":
-      return "text-green-500";
+      return "text-foreground";
     case "error":
-      return "text-destructive";
+      return "text-muted-foreground";
     case "cancelled":
-      return "text-yellow-500";
+      return "text-muted-foreground";
     default:
       return "text-muted-foreground";
   }
@@ -92,73 +93,13 @@ function getStatusColorClass(status: PreprocessingStatus): string {
 function StatusIcon({ status }: { status: PreprocessingStatus }) {
   switch (status) {
     case "running":
-      return (
-        <svg
-          className="h-4 w-4 animate-spin"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-      );
+      return <Loader2 className="h-4 w-4 animate-spin" />;
     case "completed":
-      return (
-        <svg
-          className="h-4 w-4 text-green-500"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-            clipRule="evenodd"
-          />
-        </svg>
-      );
+      return <CheckCircle2 className="h-4 w-4" />;
     case "error":
-      return (
-        <svg
-          className="h-4 w-4 text-destructive"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-            clipRule="evenodd"
-          />
-        </svg>
-      );
+      return <XCircle className="h-4 w-4" />;
     case "cancelled":
-      return (
-        <svg
-          className="h-4 w-4 text-yellow-500"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
-            clipRule="evenodd"
-          />
-        </svg>
-      );
+      return <StopCircle className="h-4 w-4" />;
     default:
       return null;
   }
@@ -272,9 +213,9 @@ export function ProgressPanel({
       {/* Completion message */}
       {isComplete && (
         <div className="flex flex-col gap-2">
-          <ProgressBar value={100} variant="success" size="default" />
-          <p className="text-sm text-green-500">
-            Preprocessing completed successfully!
+          <ProgressBar value={100} variant="default" size="default" />
+          <p className="text-sm text-muted-foreground">
+            Preprocessing completed successfully.
           </p>
         </div>
       )}
@@ -284,10 +225,10 @@ export function ProgressPanel({
         <div className="flex flex-col gap-2">
           <ProgressBar
             value={overallProgress * 100}
-            variant="error"
+            variant="default"
             size="default"
           />
-          <p className="text-sm text-destructive break-words">{error}</p>
+          <p className="text-sm text-muted-foreground break-words">{error}</p>
         </div>
       )}
 
@@ -296,10 +237,10 @@ export function ProgressPanel({
         <div className="flex flex-col gap-2">
           <ProgressBar
             value={overallProgress * 100}
-            variant="warning"
+            variant="default"
             size="default"
           />
-          <p className="text-sm text-yellow-500">
+          <p className="text-sm text-muted-foreground">
             Preprocessing was cancelled at {Math.round(overallProgress * 100)}%
           </p>
         </div>

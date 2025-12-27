@@ -3,115 +3,225 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  FileUp,
+  Table2,
+  Cog,
+  Settings,
+  X,
+  CheckCircle2,
+  Circle,
+  ChevronRight,
+} from "lucide-react";
 
 import type { FileInfo } from "@/types";
 import { useFileState } from "@/lib/hooks/use-file-state";
+import { usePreprocessing } from "@/lib/hooks/use-preprocessing";
 import AppShell from "@/components/layout/app-shell";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
-/**
- * Home Toolbar - Quick actions for the home page.
- */
-const HomeToolbar = () => {
-  return null; // Home page has no toolbar actions
-};
+// ============================================================================
+// HELPERS
+// ============================================================================
 
-/**
- * Quick action card component.
- */
-interface ActionCardProps {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-const ActionCard = ({
-  title,
-  description,
-  icon,
-  onClick,
-  disabled,
-}: ActionCardProps) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className="flex flex-col items-center p-6 rounded-lg border bg-card text-card-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-48"
-  >
-    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
-      {icon}
+// ============================================================================
+// WELCOME STATE (No file loaded)
+// ============================================================================
+
+interface WelcomeStateProps {
+  onImport: () => void;
+}
+
+const WelcomeState = ({ onImport }: WelcomeStateProps) => {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8">
+      {/* Logo/Title */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold mb-2">Lex Machina</h1>
+        <p className="text-muted-foreground">No-Code AutoML for Everyone</p>
+      </div>
+
+      {/* Import Card - Settings style */}
+      <div className="border rounded-lg max-w-md w-full">
+        <div className="px-4 py-3 border-b bg-muted/30">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Get Started
+          </h2>
+        </div>
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <FileUp className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Import a CSV file to begin analyzing your data
+          </p>
+          <Button onClick={onImport} className="gap-2">
+            <FileUp className="w-4 h-4" />
+            Import Data
+          </Button>
+        </div>
+      </div>
+
+      {/* Features Row - text only, no icons */}
+      <div className="flex items-center gap-6 mt-8 text-xs text-muted-foreground">
+        <span>Local-first</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>AutoML</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>Explainable</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>No-Code</span>
+      </div>
     </div>
-    <h3 className="font-semibold mb-1">{title}</h3>
-    <p className="text-xs text-muted-foreground text-center">{description}</p>
-  </button>
-);
+  );
+};
 
-/**
- * Icon components for action cards.
- */
-const ImportIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
+// ============================================================================
+// WORKING STATE (File loaded)
+// ============================================================================
 
-const ViewDataIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <line x1="3" y1="9" x2="21" y2="9" />
-    <line x1="3" y1="15" x2="21" y2="15" />
-    <line x1="9" y1="3" x2="9" y2="21" />
-    <line x1="15" y1="3" x2="15" y2="21" />
-  </svg>
-);
+interface WorkflowStep {
+  id: string;
+  label: string;
+  completed: boolean;
+  active: boolean;
+}
 
-const AnalyzeIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="18" y1="20" x2="18" y2="10" />
-    <line x1="12" y1="20" x2="12" y2="4" />
-    <line x1="6" y1="20" x2="6" y2="14" />
-  </svg>
-);
+interface WorkingStateProps {
+  fileInfo: FileInfo;
+  hasProcessed: boolean;
+  onClear: () => void;
+  onNavigate: (path: string) => void;
+}
 
-/**
- * Home page content - Welcome screen with quick actions.
- */
-const HomeContent = () => {
+const WorkingState = ({ fileInfo, hasProcessed, onClear, onNavigate }: WorkingStateProps) => {
+  const steps: WorkflowStep[] = [
+    { id: "import", label: "Import", completed: true, active: false },
+    { id: "process", label: "Process", completed: hasProcessed, active: !hasProcessed },
+    { id: "analyze", label: "Analyze", completed: false, active: false },
+    { id: "train", label: "Train", completed: false, active: false },
+  ];
+
+  const quickActions = [
+    { id: "data", label: "View Data", icon: Table2, path: "/data" },
+    { id: "process", label: "Process", icon: Cog, path: "/processing" },
+    { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8">
+      {/* Logo/Title */}
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold mb-2">Lex Machina</h1>
+        <p className="text-muted-foreground">No-Code AutoML for Everyone</p>
+      </div>
+
+      {/* File Info Card */}
+      <div className="border rounded-lg w-full max-w-lg mb-4">
+        <div className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Current File
+          </h2>
+          <button
+            onClick={onClear}
+            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title="Close file"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium truncate" title={fileInfo.name}>
+              {fileInfo.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {fileInfo.row_count.toLocaleString()} rows · {fileInfo.column_count} cols · {formatBytes(fileInfo.size_bytes)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Workflow Stepper - inline */}
+      <div className="flex items-center gap-1 mb-6">
+        {steps.map((step, index) => (
+          <div key={step.id} className="flex items-center">
+            <div className="flex items-center gap-1.5">
+              {step.completed ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : step.active ? (
+                <Circle className="w-4 h-4 text-primary fill-primary/20" />
+              ) : (
+                <Circle className="w-4 h-4 text-muted-foreground/30" />
+              )}
+              <span
+                className={cn(
+                  "text-sm",
+                  step.completed && "text-foreground",
+                  step.active && "text-foreground font-medium",
+                  !step.completed && !step.active && "text-muted-foreground/50"
+                )}
+              >
+                {step.label}
+              </span>
+            </div>
+            {index < steps.length - 1 && (
+              <ChevronRight className="w-4 h-4 mx-2 text-muted-foreground/30" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Actions - inline buttons */}
+      <div className="flex items-center gap-2 mb-8">
+        {quickActions.map((action) => (
+          <Button
+            key={action.id}
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate(action.path)}
+            className="gap-1.5"
+          >
+            <action.icon className="w-4 h-4" />
+            {action.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Features Row - text only */}
+      <div className="flex items-center gap-6 text-xs text-muted-foreground">
+        <span>Local-first</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>AutoML</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>Explainable</span>
+        <span className="text-muted-foreground/30">·</span>
+        <span>No-Code</span>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// HOME PAGE
+// ============================================================================
+
+export default function HomePage() {
   const router = useRouter();
   const { fileInfo, isFileLoaded } = useFileState();
+  const { status } = usePreprocessing();
+
+  const hasProcessed = status === "completed";
 
   const handleImport = useCallback(async () => {
     try {
@@ -124,90 +234,39 @@ const HomeContent = () => {
 
       await invoke<FileInfo>("load_file", { path: filePath });
       toast.success("File loaded successfully");
-      // Navigate to data page after successful import
-      router.push("/data");
     } catch (err) {
       toast.error(`Failed to import file: ${err}`);
     }
-  }, [fileInfo, router]);
+  }, [fileInfo]);
 
-  const handleViewData = useCallback(() => {
-    router.push("/data");
-  }, [router]);
+  const handleClearFile = useCallback(async () => {
+    try {
+      await invoke("close_file");
+      toast.success("File closed");
+    } catch (err) {
+      toast.error(`Failed to close file: ${err}`);
+    }
+  }, []);
 
-  const handleAnalyze = useCallback(() => {
-    router.push("/analysis");
-  }, [router]);
-
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      {/* Welcome Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-2">Lex Machina</h1>
-        <p className="text-lg text-muted-foreground">
-          No-Code Data Analytics & AutoML
-        </p>
-      </div>
-
-      {/* Current File Status */}
-      {isFileLoaded && fileInfo && (
-        <div className="mb-8 p-4 rounded-lg bg-muted/50 border text-center">
-          <p className="text-sm text-muted-foreground mb-1">Current file</p>
-          <p className="font-medium">{fileInfo.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {fileInfo.row_count.toLocaleString()} rows, {fileInfo.column_count}{" "}
-            columns
-          </p>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="flex gap-4">
-        <ActionCard
-          title="Import Data"
-          description="Load a CSV file to get started"
-          icon={<ImportIcon />}
-          onClick={handleImport}
-        />
-        <ActionCard
-          title="View Data"
-          description="Browse and explore your dataset"
-          icon={<ViewDataIcon />}
-          onClick={handleViewData}
-        />
-        <ActionCard
-          title="Analyze"
-          description="Run statistical analysis"
-          icon={<AnalyzeIcon />}
-          onClick={handleAnalyze}
-          disabled={!isFileLoaded}
-        />
-      </div>
-
-      {/* Getting Started Hint */}
-      {!isFileLoaded && (
-        <p className="mt-12 text-sm text-muted-foreground">
-          Import a CSV file to begin your data analysis journey
-        </p>
-      )}
-    </div>
+  const handleNavigate = useCallback(
+    (path: string) => {
+      router.push(path);
+    },
+    [router]
   );
-};
 
-/**
- * Home page - Welcome screen with quick actions.
- *
- * Features:
- * - Quick import action
- * - Navigation to data/analysis pages
- * - Current file status display
- */
-const HomePage = () => {
   return (
-    <AppShell toolbar={<HomeToolbar />}>
-      <HomeContent />
+    <AppShell toolbar={null}>
+      {isFileLoaded && fileInfo ? (
+        <WorkingState
+          fileInfo={fileInfo}
+          hasProcessed={hasProcessed}
+          onClear={handleClearFile}
+          onNavigate={handleNavigate}
+        />
+      ) : (
+        <WelcomeState onImport={handleImport} />
+      )}
     </AppShell>
   );
-};
-
-export default HomePage;
+}

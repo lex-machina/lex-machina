@@ -30,3 +30,5 @@ tauri-plugin-dialog = "2"
 
 # internal crates
 lex-processing = { path = "../crates/lex-processing" }
+tauri-plugin-store = "2"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

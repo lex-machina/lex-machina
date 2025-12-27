@@ -1,6 +1,6 @@
 // Preprocessing components barrel export
-export { ColumnSelector } from "./column-selector";
-export type { ColumnSelectorProps } from "./column-selector";
+export { ColumnSelector, ColumnSelectorHeader } from "./column-selector";
+export type { ColumnSelectorProps, ColumnSelectorHeaderProps } from "./column-selector";
 
 export { RowRangeSelector } from "./row-range-selector";
 export type { RowRangeSelectorProps } from "./row-range-selector";

@@ -2,16 +2,19 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { HistoryList } from "@/components/preprocessing/history-list";
 import type {
   PreprocessingSummary,
   PreprocessingAction,
   ColumnSummary,
   ActionType,
   ExportResult,
+  PreprocessingHistoryEntry,
 } from "@/types";
 
 // ============================================================================
@@ -19,14 +22,20 @@ import type {
 // ============================================================================
 
 export interface ResultsPanelProps {
-  /** The preprocessing summary to display */
-  summary: PreprocessingSummary;
+  /** The preprocessing summary to display (null if no results yet) */
+  summary: PreprocessingSummary | null;
   /** Callback when user wants to view the processed data */
   onViewData?: () => void;
   /** Callback when user wants to export the processed data */
   onExport?: () => void;
-  /** Callback to dismiss/close the panel */
-  onDismiss?: () => void;
+  /** Function to fetch history entries */
+  getHistory: () => Promise<PreprocessingHistoryEntry[]>;
+  /** Callback when a history entry is selected */
+  onSelectHistoryEntry?: (entry: PreprocessingHistoryEntry) => void;
+  /** Callback to clear all history */
+  onClearHistory?: () => Promise<void>;
+  /** Whether panel is disabled (e.g., during processing) */
+  disabled?: boolean;
   /** Additional class names */
   className?: string;
 }
@@ -34,22 +43,6 @@ export interface ResultsPanelProps {
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-/**
- * Format duration in human-readable format.
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    return `${ms}ms`;
-  }
-  const seconds = ms / 1000;
-  if (seconds < 60) {
-    return `${seconds.toFixed(1)}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60);
-  return `${minutes}m ${remainingSeconds}s`;
-}
 
 /**
  * Format a number with locale-aware formatting.
@@ -69,20 +62,14 @@ function formatPercent(value: number): string {
  * Get the quality score color.
  */
 function getQualityColor(score: number): string {
-  if (score >= 0.9) return "text-green-500";
-  if (score >= 0.7) return "text-yellow-500";
-  if (score >= 0.5) return "text-orange-500";
-  return "text-red-500";
+  return score >= 0.5 ? "text-foreground" : "text-muted-foreground";
 }
 
 /**
  * Get quality badge variant.
  */
 function getQualityBadgeClass(score: number): string {
-  if (score >= 0.9) return "bg-green-500/20 text-green-400 border-green-500/30";
-  if (score >= 0.7) return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-  if (score >= 0.5) return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-  return "bg-red-500/20 text-red-400 border-red-500/30";
+  return score >= 0.7 ? "bg-muted text-foreground" : "bg-muted text-muted-foreground";
 }
 
 /**
@@ -106,30 +93,7 @@ function getActionTypeLabel(type: ActionType): string {
   return labels[type] ?? type;
 }
 
-/**
- * Get action type icon color.
- */
-function getActionTypeColor(type: ActionType): string {
-  switch (type) {
-    case "column_removed":
-    case "rows_removed":
-      return "text-red-400";
-    case "type_corrected":
-    case "value_cleaned":
-      return "text-blue-400";
-    case "value_imputed":
-      return "text-purple-400";
-    case "outlier_handled":
-      return "text-orange-400";
-    case "duplicates_removed":
-      return "text-yellow-400";
-    case "target_identified":
-    case "problem_type_detected":
-      return "text-green-400";
-    default:
-      return "text-muted-foreground";
-  }
-}
+
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -146,8 +110,6 @@ interface StatCardProps {
 function StatCard({ label, before, after, change, formatFn }: StatCardProps) {
   const format = formatFn ?? ((v) => String(v));
   const hasChange = change !== undefined && change !== 0;
-  const isPositive = change !== undefined && change > 0;
-  const isNegative = change !== undefined && change < 0;
 
   return (
     <div className="flex flex-col gap-1 p-3 rounded-md bg-muted/50">
@@ -155,15 +117,9 @@ function StatCard({ label, before, after, change, formatFn }: StatCardProps) {
       <div className="flex items-baseline gap-2">
         <span className="text-lg font-semibold tabular-nums">{format(after)}</span>
         {hasChange && (
-          <span
-            className={cn(
-              "text-xs tabular-nums",
-              isPositive && "text-green-500",
-              isNegative && "text-red-500"
-            )}
-          >
-            {isPositive ? "+" : ""}
-            {typeof change === "number" ? formatNumber(change) : change}
+          <span className="text-xs tabular-nums text-muted-foreground">
+            ({typeof change === "number" && change > 0 ? "+" : ""}
+            {typeof change === "number" ? formatNumber(change) : change})
           </span>
         )}
       </div>
@@ -182,11 +138,7 @@ function ActionItem({ action }: ActionItemProps) {
   return (
     <div className="flex items-start gap-3 py-2 border-b border-border last:border-0">
       <span
-        className={cn(
-          "mt-0.5 text-xs font-medium px-1.5 py-0.5 rounded",
-          getActionTypeColor(action.action_type),
-          "bg-current/10"
-        )}
+        className="mt-0.5 text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
       >
         {getActionTypeLabel(action.action_type)}
       </span>
@@ -220,7 +172,7 @@ function ColumnSummaryItem({ column }: ColumnSummaryItemProps) {
       className={cn(
         "flex flex-col gap-2 p-3 rounded-md border",
         column.was_removed
-          ? "border-red-500/30 bg-red-500/5"
+          ? "border-border bg-muted/30"
           : hasChanges
             ? "border-border bg-muted/30"
             : "border-border/50 bg-transparent"
@@ -231,7 +183,7 @@ function ColumnSummaryItem({ column }: ColumnSummaryItemProps) {
           {column.name}
         </span>
         {column.was_removed && (
-          <span className="text-xs text-red-400 px-1.5 py-0.5 rounded bg-red-500/10">
+          <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
             Removed
           </span>
         )}
@@ -246,7 +198,7 @@ function ColumnSummaryItem({ column }: ColumnSummaryItemProps) {
             {column.original_type !== column.final_type && (
               <>
                 <span className="text-muted-foreground">→</span>
-                <span className="font-mono text-blue-400">{column.final_type}</span>
+                <span className="font-mono">{column.final_type}</span>
               </>
             )}
           </div>
@@ -284,7 +236,7 @@ function ColumnSummaryItem({ column }: ColumnSummaryItemProps) {
           {/* Imputation method */}
           {column.imputation_method && (
             <div className="text-xs text-muted-foreground">
-              Imputation: <span className="text-purple-400">{column.imputation_method}</span>
+              Imputation: <span>{column.imputation_method}</span>
             </div>
           )}
         </>
@@ -298,35 +250,16 @@ function ColumnSummaryItem({ column }: ColumnSummaryItemProps) {
 }
 
 // ============================================================================
-// RESULTS PANEL COMPONENT
+// RESULTS CONTENT (when summary exists)
 // ============================================================================
 
-/**
- * A panel displaying the preprocessing results summary.
- *
- * Shows before/after statistics, quality scores, actions taken,
- * and per-column summaries.
- *
- * @example
- * ```tsx
- * const { summary } = usePreprocessing();
- *
- * {summary && (
- *   <ResultsPanel
- *     summary={summary}
- *     onViewData={() => router.push("/data")}
- *     onDismiss={reset}
- *   />
- * )}
- * ```
- */
-export function ResultsPanel({
-  summary,
-  onViewData,
-  onExport,
-  onDismiss,
-  className,
-}: ResultsPanelProps) {
+interface ResultsContentProps {
+  summary: PreprocessingSummary;
+  onViewData?: () => void;
+  onExport?: () => void;
+}
+
+function ResultsContent({ summary, onViewData, onExport }: ResultsContentProps) {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Handle export button click
@@ -382,225 +315,319 @@ export function ResultsPanel({
   }, [summary.column_summaries]);
 
   return (
+    <>
+      {/* Scrollable content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3">
+        <div className="flex flex-col gap-4">
+          {/* Quality Score Highlight */}
+          <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Data Quality Score</span>
+              <div className="flex items-baseline gap-3">
+                <span className={cn("text-2xl font-bold", getQualityColor(summary.data_quality_score_after))}>
+                  {formatPercent(summary.data_quality_score_after)}
+                </span>
+                {qualityImprovement !== 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    ({qualityImprovement > 0 ? "+" : ""}
+                    {formatPercent(qualityImprovement)})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div
+              className={cn(
+                "px-2 py-1 rounded text-xs font-medium",
+                getQualityBadgeClass(summary.data_quality_score_after)
+              )}
+            >
+              {summary.data_quality_score_after >= 0.9
+                ? "Excellent"
+                : summary.data_quality_score_after >= 0.7
+                  ? "Good"
+                  : summary.data_quality_score_after >= 0.5
+                    ? "Fair"
+                    : "Poor"}
+            </div>
+          </div>
+
+          {/* Inner Tabs for Overview/Actions/Columns */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full">
+              <TabsTrigger value="overview" className="flex-1 min-w-0 px-2">Overview</TabsTrigger>
+              <TabsTrigger value="actions" className="flex-1 min-w-0 px-2">
+                Actions ({summary.actions.length})
+              </TabsTrigger>
+              <TabsTrigger value="columns" className="flex-1 min-w-0 px-2">
+                Columns ({summary.column_summaries.length})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Overview Tab */}
+            <TabsContent value="overview">
+              <div className="flex flex-col gap-4">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard
+                    label="Rows"
+                    before={summary.rows_before}
+                    after={summary.rows_after}
+                    change={-summary.rows_removed}
+                    formatFn={(v) => formatNumber(Number(v))}
+                  />
+                  <StatCard
+                    label="Columns"
+                    before={summary.columns_before}
+                    after={summary.columns_after}
+                    change={-summary.columns_removed}
+                    formatFn={(v) => formatNumber(Number(v))}
+                  />
+                  <StatCard
+                    label="Issues Found"
+                    before={0}
+                    after={summary.issues_found}
+                    formatFn={(v) => formatNumber(Number(v))}
+                  />
+                  <StatCard
+                    label="Issues Resolved"
+                    before={0}
+                    after={summary.issues_resolved}
+                    formatFn={(v) => formatNumber(Number(v))}
+                  />
+                </div>
+
+                {/* Action Summary */}
+                {Object.keys(actionCounts).length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(actionCounts).map(([type, count]) => (
+                      <span
+                        key={type}
+                        className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground"
+                      >
+                        {count} {getActionTypeLabel(type as ActionType).toLowerCase()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Warnings */}
+                {summary.warnings.length > 0 && (
+                  <div className="flex flex-col gap-2 p-3 rounded-md border border-border bg-muted/30">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Warnings ({summary.warnings.length})
+                    </span>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {summary.warnings.map((warning, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span>•</span>
+                          {warning}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Actions Tab */}
+            <TabsContent value="actions">
+              <div className="flex flex-col">
+                {summary.actions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No actions were taken
+                  </p>
+                ) : (
+                  summary.actions.map((action, idx) => (
+                    <ActionItem key={idx} action={action} />
+                  ))
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Columns Tab */}
+            <TabsContent value="columns">
+              <div className="flex flex-col gap-4">
+                {/* Removed columns */}
+                {removedColumns.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Removed ({removedColumns.length})
+                    </span>
+                    <div className="grid grid-cols-1 gap-2">
+                      {removedColumns.map((col) => (
+                        <ColumnSummaryItem key={col.name} column={col} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modified columns */}
+                {modifiedColumns.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Modified ({modifiedColumns.length})
+                    </span>
+                    <div className="grid grid-cols-1 gap-2">
+                      {modifiedColumns.map((col) => (
+                        <ColumnSummaryItem key={col.name} column={col} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {removedColumns.length === 0 && modifiedColumns.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No columns were modified
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Footer Actions - fixed at bottom */}
+      <div className="flex items-center gap-2 p-3 border-t border-border shrink-0">
+        {onViewData && (
+          <Button variant="default" size="sm" onClick={onViewData}>
+            View Data
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          Export
+        </Button>
+      </div>
+    </>
+  );
+}
+
+// ============================================================================
+// EMPTY RESULTS STATE
+// ============================================================================
+
+function EmptyResultsState() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <CheckCircle2 className="h-8 w-8 mb-3 text-muted-foreground/50" />
+      <p className="text-sm font-medium text-muted-foreground">No results yet</p>
+      <p className="text-xs text-muted-foreground mt-1">
+        Run preprocessing to see results
+      </p>
+    </div>
+  );
+}
+
+// ============================================================================
+// RESULTS PANEL COMPONENT
+// ============================================================================
+
+/**
+ * A panel with two tabs: Results and History.
+ *
+ * - Results tab: Shows the last preprocessing result summary, or empty state
+ * - History tab: Shows preprocessing history with selectable entries
+ *
+ * Auto-switches to Results tab when a new result comes in.
+ *
+ * @example
+ * ```tsx
+ * <ResultsPanel
+ *   summary={summary}
+ *   onViewData={() => router.push("/data")}
+ *   getHistory={getHistory}
+ *   onSelectHistoryEntry={handleSelectEntry}
+ *   onClearHistory={clearHistory}
+ * />
+ * ```
+ */
+export function ResultsPanel({
+  summary,
+  onViewData,
+  onExport,
+  getHistory,
+  onSelectHistoryEntry,
+  onClearHistory,
+  disabled = false,
+  className,
+}: ResultsPanelProps) {
+  // Track if we've ever seen a summary to know initial tab
+  const [activeTab, setActiveTab] = useState<"results" | "history">("history");
+  
+  // Track the timestamp/id of the current summary to detect changes
+  const [lastSummaryKey, setLastSummaryKey] = useState<string | null>(null);
+  
+  // Compute a key from the summary (using duration_ms and rows as a simple fingerprint)
+  const summaryKey = summary 
+    ? `${summary.duration_ms}-${summary.rows_before}-${summary.rows_after}` 
+    : null;
+  
+  // When summary changes (new key), switch to results tab
+  if (summaryKey && summaryKey !== lastSummaryKey) {
+    setLastSummaryKey(summaryKey);
+    if (activeTab !== "results") {
+      setActiveTab("results");
+    }
+  }
+
+  return (
     <div
       className={cn(
-        "flex flex-col gap-4 p-4 rounded-lg border border-border bg-card",
+        "h-full min-h-0 flex flex-col border rounded-lg overflow-hidden",
         className
       )}
       data-slot="results-panel"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg
-            className="h-5 w-5 text-green-500"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
+      {/* Header with tabs */}
+      <div className="px-3 py-2 border-b bg-muted/30 shrink-0">
+        <div className="grid grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("results")}
+            className={cn(
+              "text-xs font-semibold uppercase tracking-wider transition-colors text-center",
+              activeTab === "results"
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="text-sm font-medium">Preprocessing Complete</span>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {formatDuration(summary.duration_ms)}
-        </span>
-      </div>
-
-      {/* Quality Score Highlight */}
-      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Data Quality Score</span>
-          <div className="flex items-baseline gap-3">
-            <span className={cn("text-2xl font-bold", getQualityColor(summary.data_quality_score_after))}>
-              {formatPercent(summary.data_quality_score_after)}
-            </span>
-            {qualityImprovement !== 0 && (
-              <span
-                className={cn(
-                  "text-sm",
-                  qualityImprovement > 0 ? "text-green-500" : "text-red-500"
-                )}
-              >
-                {qualityImprovement > 0 ? "+" : ""}
-                {formatPercent(qualityImprovement)}
-              </span>
+            Results
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("history")}
+            className={cn(
+              "text-xs font-semibold uppercase tracking-wider transition-colors text-center",
+              activeTab === "history"
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             )}
-          </div>
-        </div>
-        <div
-          className={cn(
-            "px-2 py-1 rounded border text-xs font-medium",
-            getQualityBadgeClass(summary.data_quality_score_after)
-          )}
-        >
-          {summary.data_quality_score_after >= 0.9
-            ? "Excellent"
-            : summary.data_quality_score_after >= 0.7
-              ? "Good"
-              : summary.data_quality_score_after >= 0.5
-                ? "Fair"
-                : "Poor"}
+          >
+            History
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="actions">
-            Actions ({summary.actions.length})
-          </TabsTrigger>
-          <TabsTrigger value="columns">
-            Columns ({summary.column_summaries.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="mt-4">
-          <div className="flex flex-col gap-4">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                label="Rows"
-                before={summary.rows_before}
-                after={summary.rows_after}
-                change={-summary.rows_removed}
-                formatFn={(v) => formatNumber(Number(v))}
-              />
-              <StatCard
-                label="Columns"
-                before={summary.columns_before}
-                after={summary.columns_after}
-                change={-summary.columns_removed}
-                formatFn={(v) => formatNumber(Number(v))}
-              />
-              <StatCard
-                label="Issues Found"
-                before={0}
-                after={summary.issues_found}
-                formatFn={(v) => formatNumber(Number(v))}
-              />
-              <StatCard
-                label="Issues Resolved"
-                before={0}
-                after={summary.issues_resolved}
-                formatFn={(v) => formatNumber(Number(v))}
-              />
-            </div>
-
-            {/* Action Summary */}
-            {Object.keys(actionCounts).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(actionCounts).map(([type, count]) => (
-                  <span
-                    key={type}
-                    className={cn(
-                      "text-xs px-2 py-1 rounded",
-                      getActionTypeColor(type as ActionType),
-                      "bg-current/10"
-                    )}
-                  >
-                    {count} {getActionTypeLabel(type as ActionType).toLowerCase()}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Warnings */}
-            {summary.warnings.length > 0 && (
-              <div className="flex flex-col gap-2 p-3 rounded-md border border-yellow-500/30 bg-yellow-500/5">
-                <span className="text-xs font-medium text-yellow-500">
-                  Warnings ({summary.warnings.length})
-                </span>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  {summary.warnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-yellow-500">•</span>
-                      {warning}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Actions Tab */}
-        <TabsContent value="actions" className="mt-4">
-          <div className="flex flex-col max-h-[300px] overflow-y-auto">
-            {summary.actions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No actions were taken
-              </p>
-            ) : (
-              summary.actions.map((action, idx) => (
-                <ActionItem key={idx} action={action} />
-              ))
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Columns Tab */}
-        <TabsContent value="columns" className="mt-4">
-          <div className="flex flex-col gap-4 max-h-[300px] overflow-y-auto">
-            {/* Removed columns */}
-            {removedColumns.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-red-400">
-                  Removed ({removedColumns.length})
-                </span>
-                <div className="grid grid-cols-1 gap-2">
-                  {removedColumns.map((col) => (
-                    <ColumnSummaryItem key={col.name} column={col} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Modified columns */}
-            {modifiedColumns.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Modified ({modifiedColumns.length})
-                </span>
-                <div className="grid grid-cols-1 gap-2">
-                  {modifiedColumns.map((col) => (
-                    <ColumnSummaryItem key={col.name} column={col} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {removedColumns.length === 0 && modifiedColumns.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No columns were modified
-              </p>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-2 border-t border-border">
-        {onViewData && (
-          <Button variant="default" size="sm" onClick={onViewData}>
-            View Processed Data
-          </Button>
-        )}
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          Export CSV
-        </Button>
-        {onDismiss && (
-          <Button variant="ghost" size="sm" onClick={onDismiss}>
-            Dismiss
-          </Button>
-        )}
-      </div>
+      {/* Tab Content */}
+      {activeTab === "results" ? (
+        summary ? (
+          <ResultsContent
+            summary={summary}
+            onViewData={onViewData}
+            onExport={onExport}
+          />
+        ) : (
+          <EmptyResultsState />
+        )
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">
+          <HistoryList
+            getHistory={getHistory}
+            onSelectEntry={onSelectHistoryEntry}
+            onClearHistory={onClearHistory}
+            disabled={disabled}
+          />
+        </div>
+      )}
     </div>
   );
 }

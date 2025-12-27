@@ -1,2 +1,0 @@
-- Cancel isn't working
-- Processed data data viewing columns sizes isn't being auto-sized to best fit the content

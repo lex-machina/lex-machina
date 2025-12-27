@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Loader2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { PreprocessingHistoryEntry } from "@/types";
@@ -78,13 +79,10 @@ function formatPercent(value: number): string {
 }
 
 /**
- * Get quality score color class.
+ * Get quality score color class - uses muted styling for consistency.
  */
 function getQualityColorClass(score: number): string {
-  if (score >= 0.9) return "text-green-500";
-  if (score >= 0.7) return "text-yellow-500";
-  if (score >= 0.5) return "text-orange-500";
-  return "text-red-500";
+  return score >= 0.5 ? "text-foreground" : "text-muted-foreground";
 }
 
 // ============================================================================
@@ -137,12 +135,7 @@ function HistoryEntryItem({ entry, onSelect, disabled }: HistoryEntryItemProps) 
           {formatPercent(summary.data_quality_score_after)}
         </span>
         {qualityImprovement !== 0 && (
-          <span
-            className={cn(
-              "text-xs",
-              qualityImprovement > 0 ? "text-green-500" : "text-red-500"
-            )}
-          >
+          <span className="text-xs text-muted-foreground">
             ({qualityImprovement > 0 ? "+" : ""}{formatPercent(qualityImprovement)})
           </span>
         )}
@@ -153,13 +146,13 @@ function HistoryEntryItem({ entry, onSelect, disabled }: HistoryEntryItemProps) 
         <span>
           {formatNumber(summary.rows_after)} rows
           {summary.rows_removed > 0 && (
-            <span className="text-red-400"> (-{formatNumber(summary.rows_removed)})</span>
+            <span> (-{formatNumber(summary.rows_removed)})</span>
           )}
         </span>
         <span>
           {formatNumber(summary.columns_after)} cols
           {summary.columns_removed > 0 && (
-            <span className="text-red-400"> (-{formatNumber(summary.columns_removed)})</span>
+            <span> (-{formatNumber(summary.columns_removed)})</span>
           )}
         </span>
         <span>
@@ -170,7 +163,7 @@ function HistoryEntryItem({ entry, onSelect, disabled }: HistoryEntryItemProps) 
       {/* Config summary */}
       <div className="flex flex-wrap gap-1.5">
         {config.use_ai_decisions && (
-          <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+          <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
             AI
           </span>
         )}
@@ -181,7 +174,7 @@ function HistoryEntryItem({ entry, onSelect, disabled }: HistoryEntryItemProps) 
           {config.numeric_imputation}
         </span>
         {config.selected_columns.length > 0 && (
-          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+          <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
             {config.selected_columns.length} cols selected
           </span>
         )}
@@ -262,26 +255,7 @@ export function HistoryList({
           className
         )}
       >
-        <svg
-          className="h-4 w-4 animate-spin mr-2"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
+<Loader2 className="h-4 w-4 animate-spin mr-2" />
         Loading history...
       </div>
     );
@@ -315,20 +289,7 @@ export function HistoryList({
           className
         )}
       >
-        <svg
-          className="h-8 w-8 mb-2 opacity-50"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+        <Clock className="h-8 w-8 mb-2 opacity-50" />
         <p>No preprocessing history</p>
         <p className="text-xs mt-1">Run preprocessing to see results here</p>
       </div>

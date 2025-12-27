@@ -109,6 +109,24 @@ export interface PreprocessingActions {
    * Clears all preprocessing history.
    */
   clearHistory: () => Promise<void>;
+
+  /**
+   * Loads the last preprocessing result from Rust state.
+   *
+   * Call this to restore persisted results after navigation.
+   * Automatically called on hook initialization.
+   *
+   * @returns Promise that resolves to the summary if one exists
+   */
+  loadLastResult: () => Promise<PreprocessingSummary | null>;
+
+  /**
+   * Clears the last preprocessing result in Rust state.
+   *
+   * Call this when the user dismisses the results panel.
+   * Does NOT clear preprocessing history.
+   */
+  clearLastResult: () => Promise<void>;
 }
 
 /**
@@ -393,9 +411,65 @@ export function usePreprocessing(): UsePreprocessingReturn {
     }
   }, []);
 
+  /**
+   * Loads the last preprocessing result from Rust state.
+   * Used to restore results after navigation.
+   */
+  const loadLastResult = useCallback(async (): Promise<PreprocessingSummary | null> => {
+    try {
+      const lastResult = await invoke<PreprocessingSummary | null>(
+        "get_last_preprocessing_result"
+      );
+      if (lastResult) {
+        setSummary(lastResult);
+        setStatus("completed");
+      }
+      return lastResult;
+    } catch (err) {
+      console.error("Failed to load last preprocessing result:", err);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Clears the last preprocessing result in Rust state.
+   * Called when user dismisses results.
+   */
+  const clearLastResult = useCallback(async () => {
+    try {
+      await invoke("clear_last_preprocessing_result");
+      setSummary(null);
+      setStatus("idle");
+    } catch (err) {
+      console.error("Failed to clear last preprocessing result:", err);
+    }
+  }, []);
+
   // ============================================================================
-  // CLEANUP
+  // INITIALIZATION & CLEANUP
   // ============================================================================
+
+  // Load persisted result on mount (restores state after navigation)
+  // Using a ref to track if we've loaded to avoid race conditions
+  const hasLoadedRef = useRef(false);
+  
+  useEffect(() => {
+    // Only load once and only if we're not currently processing
+    if (!hasLoadedRef.current && !isProcessingRef.current) {
+      hasLoadedRef.current = true;
+      // Load persisted result from Rust backend
+      invoke<PreprocessingSummary | null>("get_last_preprocessing_result")
+        .then((lastResult) => {
+          if (lastResult) {
+            setSummary(lastResult);
+            setStatus("completed");
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load last preprocessing result:", err);
+        });
+    }
+  }, []);
 
   // Cancel preprocessing on unmount if still running
   useEffect(() => {
@@ -428,5 +502,7 @@ export function usePreprocessing(): UsePreprocessingReturn {
     reset,
     getHistory,
     clearHistory,
+    loadLastResult,
+    clearLastResult,
   };
 }

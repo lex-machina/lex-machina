@@ -11,6 +11,7 @@
 //! - **ui**: UI state management (sidebar width, column widths)
 //! - **preprocessing**: Data preprocessing pipeline operations
 //! - **settings**: App settings (theme, AI provider configuration)
+//! - **keyring**: Secure credential storage (OS keychain for API keys)
 //!
 //! # How Commands Work
 //!
@@ -26,6 +27,7 @@
 pub mod dataframe;
 pub mod dialog;
 pub mod file_io;
+pub mod keyring;
 pub mod preprocessing;
 pub mod settings;
 pub mod ui;
@@ -34,6 +36,7 @@ pub mod ui;
 pub use dataframe::*;
 pub use dialog::*;
 pub use file_io::*;
+pub use keyring::*;
 pub use preprocessing::*;
 pub use settings::*;
 pub use ui::*;

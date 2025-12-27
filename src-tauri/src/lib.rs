@@ -65,6 +65,7 @@ pub mod events;
 mod state;
 
 use state::AppState;
+use tauri::Manager;
 
 /// Tauri mobile entry point attribute.
 /// This macro generates the appropriate entry point for mobile platforms.
@@ -72,6 +73,7 @@ use state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         // ====================================================================
         // PLUGINS
         // ====================================================================
@@ -136,6 +138,10 @@ pub fn run() {
             commands::get_processed_rows,
             // Clears the processed DataFrame from memory
             commands::clear_processed_data,
+            // Gets the last preprocessing result summary (persists across navigation)
+            commands::get_last_preprocessing_result,
+            // Clears the last preprocessing result (when user dismisses)
+            commands::clear_last_preprocessing_result,
             // Exports processed data to CSV with JSON report
             commands::export_processed_data,
             // Settings commands
@@ -147,19 +153,36 @@ pub fn run() {
             commands::get_ai_provider_config,
             // Configures an AI provider for preprocessing decisions
             commands::configure_ai_provider,
-            // Clears the AI provider configuration
+            // Clears the active AI provider (keeps saved keys)
             commands::clear_ai_provider,
             // Validates an AI provider API key
             commands::validate_ai_api_key,
+            // Gets list of providers with saved API keys
+            commands::get_saved_providers,
+            // Switches to a provider with a saved key
+            commands::switch_ai_provider,
+            // Deletes a saved provider's API key
+            commands::delete_saved_provider,
+            // Keyring commands (secure credential storage)
+            // Stores an API key in the OS keychain
+            commands::set_api_key,
+            // Retrieves an API key from the OS keychain
+            commands::get_api_key,
+            // Deletes an API key from the OS keychain
+            commands::delete_api_key,
+            // Checks if an API key exists in the OS keychain
+            commands::has_api_key,
         ])
         // ====================================================================
         // SETUP HOOK
         // ====================================================================
         // Setup runs once after the app is initialized but before the window opens.
-        // Used here to conditionally enable logging in debug builds
+        // Used here to:
+        // 1. Initialize logging (debug builds only)
+        // 2. Restore persisted settings from store and keychain
         .setup(|app| {
             // Only enable logging plugin in debug builds
-            // Thiss prevents log spam in production releases
+            // This prevents log spam in production releases
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -167,6 +190,15 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Initialize settings from persisted store
+            // This restores theme, sidebar width, and AI provider config
+            let state = app.state::<AppState>();
+            if let Err(e) = commands::settings::init_settings_from_store(app.handle(), &state) {
+                log::warn!("Failed to restore settings: {}", e);
+                // Non-fatal - app continues with default settings
+            }
+
             Ok(())
         })
         // ====================================================================

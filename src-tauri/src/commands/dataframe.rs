@@ -252,7 +252,8 @@ pub fn get_rows(start: usize, count: usize, state: State<'_, AppState>) -> Optio
 /// This command:
 /// 1. Drops the `DataFrame` from state (frees memory)
 /// 2. Clears the column widths from UI state
-/// 3. Emits `file:closed` event to notify frontend
+/// 3. Clears all preprocessing-related state (processed data, history, results)
+/// 4. Emits `file:closed` event to notify frontend
 ///
 /// # Parameters
 ///
@@ -300,6 +301,14 @@ pub fn close_file(app: AppHandle, state: State<'_, AppState>) {
     {
         let mut ui_guard = state.ui_state.write();
         ui_guard.column_widths = Vec::new();
+    }
+
+    // Clear all preprocessing-related state
+    // The processed data is tied to the original file, so it should be cleared
+    {
+        *state.processed_dataframe.write() = None;
+        *state.last_preprocessing_result.write() = None;
+        state.preprocessing_history.write().clear();
     }
 
     // Emit file closed event
