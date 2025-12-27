@@ -503,6 +503,26 @@ export type PreprocessingCompletePayload = PreprocessingSummary;
 export type ThemeChangedPayload = Theme;
 
 // ============================================================================
+// PREPROCESSING UI STATE (for navigation persistence)
+// ============================================================================
+
+/**
+ * UI state for the preprocessing page.
+ * Persisted in Rust across navigation.
+ * Mirrors: state.rs::PreprocessingUIState
+ */
+export interface PreprocessingUIState {
+  /** Selected column names for preprocessing */
+  selected_columns: string[];
+  /** Row range to process (start, end indices), or null for all rows */
+  row_range: [number, number] | null;
+  /** Pipeline configuration settings */
+  config: PipelineConfigRequest;
+  /** Active tab in the results panel ("results" or "history") */
+  active_results_tab: "results" | "history";
+}
+
+// ============================================================================
 // DEFAULT CONFIG VALUES
 // ============================================================================
 
@@ -519,6 +539,6 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfigRequest = {
   enable_type_correction: true,
   remove_duplicates: true,
   knn_neighbors: 5,
-  use_ai_decisions: false,
+  use_ai_decisions: true, // AI-powered "Smart Mode" is ON by default for non-technical users
   target_column: null,
 };

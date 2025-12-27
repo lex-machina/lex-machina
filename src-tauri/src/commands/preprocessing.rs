@@ -867,3 +867,43 @@ pub async fn export_processed_data(
         report_path,
     })
 }
+
+// ============================================================================
+// PREPROCESSING UI STATE PERSISTENCE
+// ============================================================================
+
+/// Gets the persisted preprocessing UI state.
+///
+/// Returns the saved column selection, row range, and configuration
+/// so it can be restored when navigating back to the preprocessing page.
+///
+/// # Parameters
+///
+/// - `state` - Tauri-managed application state
+///
+/// # Returns
+///
+/// The saved preprocessing UI state (may have empty columns if no file loaded)
+#[tauri::command]
+pub fn get_preprocessing_ui_state(
+    state: State<'_, AppState>,
+) -> crate::state::PreprocessingUIState {
+    state.preprocessing_ui_state.read().clone()
+}
+
+/// Saves the preprocessing UI state for persistence across navigation.
+///
+/// Call this whenever the user changes their selection or configuration
+/// on the preprocessing page.
+///
+/// # Parameters
+///
+/// - `ui_state` - The current UI state to save
+/// - `state` - Tauri-managed application state
+#[tauri::command]
+pub fn set_preprocessing_ui_state(
+    ui_state: crate::state::PreprocessingUIState,
+    state: State<'_, AppState>,
+) {
+    *state.preprocessing_ui_state.write() = ui_state;
+}

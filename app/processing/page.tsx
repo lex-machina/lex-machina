@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Cog,
   Sparkles,
@@ -10,10 +11,10 @@ import {
   GitBranch,
   Table2,
   Play,
-  FileText,
+  AlertTriangle,
 } from "lucide-react";
 
-import type { ColumnInfo } from "@/types";
+import type { ColumnInfo, PreprocessingUIState } from "@/types";
 import { useFileState } from "@/lib/hooks/use-file-state";
 import { usePreprocessing } from "@/lib/hooks/use-preprocessing";
 import { useSettings } from "@/lib/hooks/use-settings";
@@ -36,21 +37,6 @@ import {
   ProgressPanel,
   ResultsPanel,
 } from "@/components/preprocessing";
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-/**
- * Format bytes to human readable string.
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 
 // ============================================================================
 // EMPTY STATE
@@ -111,14 +97,12 @@ function NoFileLoadedState() {
 // ============================================================================
 
 interface ProcessingToolbarProps {
-  fileInfo: ReturnType<typeof useFileState>["fileInfo"];
   isProcessing: boolean;
   canStart: boolean;
   onStart: () => void;
 }
 
 function ProcessingToolbar({
-  fileInfo,
   isProcessing,
   canStart,
   onStart,
@@ -134,16 +118,6 @@ function ProcessingToolbar({
         <Play className="w-3.5 h-3.5 mr-1.5" />
         {isProcessing ? "Processing..." : "Start Processing"}
       </Button>
-      {fileInfo && (
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded bg-muted text-xs text-muted-foreground">
-          <FileText className="w-3.5 h-3.5" />
-          <span className="font-medium">{fileInfo.name}</span>
-          <span>•</span>
-          <span>{fileInfo.row_count.toLocaleString()} × {fileInfo.column_count}</span>
-          <span>•</span>
-          <span>{formatBytes(fileInfo.size_bytes)}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -180,6 +154,8 @@ function LeftPanel({
     onSelectionChange([]);
   }, [onSelectionChange]);
 
+  const noColumnsSelected = selectedColumns.length === 0;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Column Selector - takes remaining space with internal scroll */}
@@ -206,6 +182,13 @@ function LeftPanel({
             className="h-full"
           />
         </div>
+        {/* Warning when no columns selected */}
+        {noColumnsSelected && columns.length > 0 && (
+          <div className="px-3 py-2 border-t bg-muted/30 flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertTriangle className="size-3.5 shrink-0" />
+            <span>Select at least one column to process</span>
+          </div>
+        )}
       </div>
 
       {/* Row Range Selector - fixed at bottom */}
@@ -232,6 +215,7 @@ interface CenterPanelProps {
   config: PipelineConfigRequest;
   onConfigChange: (config: PipelineConfigRequest) => void;
   columns: ColumnInfo[];
+  selectedColumns: string[];
   hasAIProvider: boolean;
   isProcessing: boolean;
 }
@@ -240,6 +224,7 @@ function CenterPanel({
   config,
   onConfigChange,
   columns,
+  selectedColumns,
   hasAIProvider,
   isProcessing,
 }: CenterPanelProps) {
@@ -255,6 +240,7 @@ function CenterPanel({
           config={config}
           onConfigChange={onConfigChange}
           columns={columns}
+          selectedColumns={selectedColumns}
           hasAIProvider={hasAIProvider}
           disabled={isProcessing}
         />
@@ -278,6 +264,8 @@ interface RightPanelProps {
   getHistory: () => Promise<PreprocessingHistoryEntry[]>;
   clearHistory: () => Promise<void>;
   onSelectHistoryEntry: (entry: PreprocessingHistoryEntry) => void;
+  activeResultsTab: "results" | "history";
+  onActiveResultsTabChange: (tab: "results" | "history") => void;
 }
 
 function RightPanel({
@@ -291,6 +279,8 @@ function RightPanel({
   getHistory,
   clearHistory,
   onSelectHistoryEntry,
+  activeResultsTab,
+  onActiveResultsTabChange,
 }: RightPanelProps) {
   const isRunning = status === "running";
   const showProgress = isRunning || status === "error" || status === "cancelled";
@@ -316,6 +306,8 @@ function RightPanel({
           onClearHistory={clearHistory}
           disabled={isRunning}
           className="flex-1"
+          activeTab={activeResultsTab}
+          onActiveTabChange={onActiveResultsTabChange}
         />
       )}
     </div>
@@ -347,6 +339,8 @@ interface ProcessingContentProps {
   getHistory: () => Promise<PreprocessingHistoryEntry[]>;
   clearHistory: () => Promise<void>;
   onSelectHistoryEntry: (entry: PreprocessingHistoryEntry) => void;
+  activeResultsTab: "results" | "history";
+  onActiveResultsTabChange: (tab: "results" | "history") => void;
 }
 
 function ProcessingContent({
@@ -370,6 +364,8 @@ function ProcessingContent({
   getHistory,
   clearHistory,
   onSelectHistoryEntry,
+  activeResultsTab,
+  onActiveResultsTabChange,
 }: ProcessingContentProps) {
   // Show empty state when no file is loaded
   if (!fileInfo) {
@@ -397,6 +393,7 @@ function ProcessingContent({
           config={config}
           onConfigChange={onConfigChange}
           columns={columns}
+          selectedColumns={selectedColumns}
           hasAIProvider={hasAIProvider}
           isProcessing={isProcessing}
         />
@@ -415,6 +412,8 @@ function ProcessingContent({
           getHistory={getHistory}
           clearHistory={clearHistory}
           onSelectHistoryEntry={onSelectHistoryEntry}
+          activeResultsTab={activeResultsTab}
+          onActiveResultsTabChange={onActiveResultsTabChange}
         />
       </div>
     </div>
@@ -457,15 +456,143 @@ export default function ProcessingPage() {
     reset,
     getHistory,
     clearHistory,
+    setSummary,
   } = usePreprocessing();
 
+  // Track if we've loaded the persisted state (use state instead of ref to trigger re-render)
+  const [hasLoadedPersistedState, setHasLoadedPersistedState] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Local state for configuration
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [rowRange, setRowRange] = useState<RowRange | null>(null);
   const [config, setConfig] = useState<PipelineConfigRequest>(DEFAULT_PIPELINE_CONFIG);
+  const [activeResultsTab, setActiveResultsTab] = useState<"results" | "history">("history");
+
+  // Get columns from fileInfo
+  const columns = fileInfo?.columns ?? [];
+
+  // Selected columns state - initialized to all columns when file changes
+  // We use a compound state to track both selection and the file it was initialized for
+  const [selectionState, setSelectionState] = useState<{
+    filePath: string | null;
+    selected: string[];
+  }>({ filePath: null, selected: [] });
+
+  // Derive selectedColumns - if file changed, return all columns (and update state)
+  const currentFilePath = fileInfo?.path ?? null;
+  let selectedColumns = selectionState.selected;
+
+  if (currentFilePath !== selectionState.filePath && !hasLoadedPersistedState) {
+    // File changed and we haven't loaded persisted state yet - select all columns
+    selectedColumns = columns.map((col) => col.name);
+  } else if (currentFilePath !== selectionState.filePath && hasLoadedPersistedState) {
+    // Different file loaded after we restored state - reset to all columns
+    selectedColumns = columns.map((col) => col.name);
+  }
+
+  // Wrapper for setSelectedColumns that also updates the file path
+  const setSelectedColumns = useCallback(
+    (newSelection: string[]) => {
+      setSelectionState({
+        filePath: currentFilePath,
+        selected: newSelection,
+      });
+    },
+    [currentFilePath]
+  );
+
+  // Load persisted UI state when file info becomes available
+  useEffect(() => {
+    // Only attempt to load once, and only when we have file info
+    if (hasLoadedPersistedState || !fileInfo) return;
+
+    const currentFileInfo = fileInfo; // Capture for async closure
+
+    async function loadPersistedState() {
+      try {
+        const savedState = await invoke<PreprocessingUIState>("get_preprocessing_ui_state");
+        
+        // Only restore if we have saved columns (indicates previous session had data)
+        if (savedState.selected_columns.length > 0) {
+          setHasLoadedPersistedState(true);
+          
+          // Restore selected columns - filter to only include columns that exist in current file
+          const validColumns = savedState.selected_columns.filter((col) =>
+            currentFileInfo.columns.some((c) => c.name === col)
+          );
+          
+          // Only restore if we have valid columns, otherwise keep all columns selected
+          if (validColumns.length > 0) {
+            setSelectionState({
+              filePath: currentFileInfo.path,
+              selected: validColumns,
+            });
+          }
+
+          // Restore row range (clamped to current file's row count)
+          if (savedState.row_range) {
+            const maxRow = currentFileInfo.row_count;
+            setRowRange({
+              start: Math.min(savedState.row_range[0], maxRow - 1),
+              end: Math.min(savedState.row_range[1], maxRow),
+            });
+          }
+
+          // Restore config
+          setConfig(savedState.config);
+          
+          // Restore active results tab
+          if (savedState.active_results_tab === "results" || savedState.active_results_tab === "history") {
+            setActiveResultsTab(savedState.active_results_tab);
+          }
+        } else {
+          // No saved columns - mark as loaded so we don't keep trying
+          setHasLoadedPersistedState(true);
+        }
+      } catch (err) {
+        // Silently ignore - use defaults if loading fails
+        console.warn("Failed to load persisted preprocessing state:", err);
+        setHasLoadedPersistedState(true);
+      }
+    }
+
+    loadPersistedState();
+  }, [fileInfo, hasLoadedPersistedState]);
+
+  // Save UI state to Rust when it changes (debounced)
+  useEffect(() => {
+    // Skip if we haven't finished initial load or no file is loaded
+    if (!isFileLoaded) return;
+
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce the save to avoid too many IPC calls
+    saveTimeoutRef.current = setTimeout(() => {
+      const uiState: PreprocessingUIState = {
+        selected_columns: selectedColumns,
+        row_range: rowRange ? [rowRange.start, rowRange.end] : null,
+        config,
+        active_results_tab: activeResultsTab,
+      };
+
+      invoke("set_preprocessing_ui_state", { uiState }).catch((err) => {
+        console.warn("Failed to save preprocessing UI state:", err);
+      });
+    }, 300);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [selectedColumns, rowRange, config, activeResultsTab, isFileLoaded]);
 
   // Can start preprocessing?
-  const canStart = isFileLoaded && !isProcessing;
+  const hasColumnsSelected = selectedColumns.length > 0;
+  const canStart = isFileLoaded && !isProcessing && hasColumnsSelected;
 
   // Handle start preprocessing
   const handleStart = useCallback(async () => {
@@ -478,6 +605,8 @@ export default function ProcessingPage() {
         : null;
 
       await startPreprocessing(selectedColumns, rowRangeTuple, config);
+      // Switch to results tab on successful completion
+      setActiveResultsTab("results");
       toast.success("Preprocessing completed successfully");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -489,6 +618,12 @@ export default function ProcessingPage() {
   const handleViewData = useCallback(() => {
     router.push("/data?tab=processed");
   }, [router]);
+
+  // Handle clearing history - also clears the displayed summary
+  const handleClearHistory = useCallback(async () => {
+    await clearHistory();
+    reset(); // Clears summary and resets status to idle
+  }, [clearHistory, reset]);
 
   // Handle history entry selection
   const handleSelectHistoryEntry = useCallback(
@@ -519,16 +654,19 @@ export default function ProcessingPage() {
         setRowRange(null);
       }
 
+      // Show the results from this history entry
+      setSummary(entry.summary);
+      setActiveResultsTab("results");
+
       toast.info("Configuration loaded from history");
     },
-    []
+    [setSelectedColumns, setSummary]
   );
 
   return (
     <AppShell
       toolbar={
         <ProcessingToolbar
-          fileInfo={fileInfo}
           isProcessing={isProcessing}
           canStart={canStart}
           onStart={handleStart}
@@ -554,8 +692,10 @@ export default function ProcessingPage() {
         onReset={reset}
         onViewData={handleViewData}
         getHistory={getHistory}
-        clearHistory={clearHistory}
+        clearHistory={handleClearHistory}
         onSelectHistoryEntry={handleSelectHistoryEntry}
+        activeResultsTab={activeResultsTab}
+        onActiveResultsTabChange={setActiveResultsTab}
       />
     </AppShell>
   );

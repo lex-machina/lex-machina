@@ -172,6 +172,11 @@ pub fn run() {
             commands::delete_api_key,
             // Checks if an API key exists in the OS keychain
             commands::has_api_key,
+            // Preprocessing UI state persistence
+            // Gets saved preprocessing page state (columns, row range, config)
+            commands::get_preprocessing_ui_state,
+            // Saves preprocessing page state for navigation persistence
+            commands::set_preprocessing_ui_state,
         ])
         // ====================================================================
         // SETUP HOOK

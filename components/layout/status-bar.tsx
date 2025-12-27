@@ -174,13 +174,13 @@ const StatusBar = () => {
       case "idle":
         return <span>Idle</span>;
       case "running":
-        return <span className="text-primary animate-pulse">Processing...</span>;
+        return <span>Processing...</span>;
       case "completed":
-        return <span className="text-green-500">Complete</span>;
+        return <span>Complete</span>;
       case "cancelled":
-        return <span className="text-yellow-500">Cancelled</span>;
+        return <span>Cancelled</span>;
       case "error":
-        return <span className="text-red-500">Error</span>;
+        return <span>Error</span>;
       default:
         return <span>Idle</span>;
     }

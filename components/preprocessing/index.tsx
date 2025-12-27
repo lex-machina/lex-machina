@@ -12,7 +12,7 @@ export { ProgressPanel } from "./progress-panel";
 export type { ProgressPanelProps } from "./progress-panel";
 
 export { ResultsPanel } from "./results-panel";
-export type { ResultsPanelProps } from "./results-panel";
+export type { ResultsPanelProps, ResultsTabValue } from "./results-panel";
 
 export { HistoryList } from "./history-list";
 export type { HistoryListProps } from "./history-list";

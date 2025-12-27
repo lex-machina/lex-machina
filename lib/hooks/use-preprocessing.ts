@@ -127,6 +127,13 @@ export interface PreprocessingActions {
    * Does NOT clear preprocessing history.
    */
   clearLastResult: () => Promise<void>;
+
+  /**
+   * Sets the summary to display (e.g., from a history entry).
+   *
+   * @param summary - The preprocessing summary to display
+   */
+  setSummary: (summary: PreprocessingSummary) => void;
 }
 
 /**
@@ -445,6 +452,15 @@ export function usePreprocessing(): UsePreprocessingReturn {
     }
   }, []);
 
+  /**
+   * Sets the summary to display (e.g., from a history entry).
+   * Also updates status to "completed" since we have a result to show.
+   */
+  const setDisplaySummary = useCallback((newSummary: PreprocessingSummary) => {
+    setSummary(newSummary);
+    setStatus("completed");
+  }, []);
+
   // ============================================================================
   // INITIALIZATION & CLEANUP
   // ============================================================================
@@ -504,5 +520,6 @@ export function usePreprocessing(): UsePreprocessingReturn {
     clearHistory,
     loadLastResult,
     clearLastResult,
+    setSummary: setDisplaySummary,
   };
 }

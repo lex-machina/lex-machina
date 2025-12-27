@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Clock } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { PreprocessingHistoryEntry } from "@/types";
@@ -284,14 +284,14 @@ export function HistoryList({
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center p-6",
-          "text-muted-foreground text-sm",
+          "flex flex-col items-center justify-center p-6 text-center",
           className
         )}
       >
-        <Clock className="h-8 w-8 mb-2 opacity-50" />
-        <p>No preprocessing history</p>
-        <p className="text-xs mt-1">Run preprocessing to see results here</p>
+        <p className="text-sm font-medium text-muted-foreground">No preprocessing history</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Run preprocessing to see results here
+        </p>
       </div>
     );
   }

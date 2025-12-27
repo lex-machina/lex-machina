@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -21,6 +20,8 @@ import type {
 // TYPES
 // ============================================================================
 
+export type ResultsTabValue = "results" | "history";
+
 export interface ResultsPanelProps {
   /** The preprocessing summary to display (null if no results yet) */
   summary: PreprocessingSummary | null;
@@ -38,6 +39,10 @@ export interface ResultsPanelProps {
   disabled?: boolean;
   /** Additional class names */
   className?: string;
+  /** Controlled active tab value */
+  activeTab?: ResultsTabValue;
+  /** Callback when active tab changes */
+  onActiveTabChange?: (tab: ResultsTabValue) => void;
 }
 
 // ============================================================================
@@ -110,6 +115,7 @@ interface StatCardProps {
 function StatCard({ label, before, after, change, formatFn }: StatCardProps) {
   const format = formatFn ?? ((v) => String(v));
   const hasChange = change !== undefined && change !== 0;
+  const showBefore = before !== 0;
 
   return (
     <div className="flex flex-col gap-1 p-3 rounded-md bg-muted/50">
@@ -123,9 +129,11 @@ function StatCard({ label, before, after, change, formatFn }: StatCardProps) {
           </span>
         )}
       </div>
-      <span className="text-xs text-muted-foreground">
-        was {format(before)}
-      </span>
+      {showBefore && (
+        <span className="text-xs text-muted-foreground">
+          was {format(before)}
+        </span>
+      )}
     </div>
   );
 }
@@ -398,13 +406,13 @@ function ResultsContent({ summary, onViewData, onExport }: ResultsContentProps) 
 
                 {/* Action Summary */}
                 {Object.keys(actionCounts).length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-1">
                     {Object.entries(actionCounts).map(([type, count]) => (
                       <span
                         key={type}
-                        className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground"
+                        className="text-xs text-muted-foreground"
                       >
-                        {count} {getActionTypeLabel(type as ActionType).toLowerCase()}
+                        • {count} {getActionTypeLabel(type as ActionType).toLowerCase()}
                       </span>
                     ))}
                   </div>
@@ -508,7 +516,6 @@ function ResultsContent({ summary, onViewData, onExport }: ResultsContentProps) 
 function EmptyResultsState() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <CheckCircle2 className="h-8 w-8 mb-3 text-muted-foreground/50" />
       <p className="text-sm font-medium text-muted-foreground">No results yet</p>
       <p className="text-xs text-muted-foreground mt-1">
         Run preprocessing to see results
@@ -549,25 +556,20 @@ export function ResultsPanel({
   onClearHistory,
   disabled = false,
   className,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
 }: ResultsPanelProps) {
-  // Track if we've ever seen a summary to know initial tab
-  const [activeTab, setActiveTab] = useState<"results" | "history">("history");
+  // Internal state for uncontrolled mode
+  const [internalActiveTab, setInternalActiveTab] = useState<ResultsTabValue>("history");
   
-  // Track the timestamp/id of the current summary to detect changes
-  const [lastSummaryKey, setLastSummaryKey] = useState<string | null>(null);
+  // Use controlled value if provided, otherwise use internal state
+  const activeTab = controlledActiveTab ?? internalActiveTab;
   
-  // Compute a key from the summary (using duration_ms and rows as a simple fingerprint)
-  const summaryKey = summary 
-    ? `${summary.duration_ms}-${summary.rows_before}-${summary.rows_after}` 
-    : null;
-  
-  // When summary changes (new key), switch to results tab
-  if (summaryKey && summaryKey !== lastSummaryKey) {
-    setLastSummaryKey(summaryKey);
-    if (activeTab !== "results") {
-      setActiveTab("results");
-    }
-  }
+  // Handler that notifies parent and updates internal state
+  const handleTabChange = useCallback((tab: ResultsTabValue) => {
+    setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  }, [onActiveTabChange]);
 
   return (
     <div
@@ -582,7 +584,7 @@ export function ResultsPanel({
         <div className="grid grid-cols-2">
           <button
             type="button"
-            onClick={() => setActiveTab("results")}
+            onClick={() => handleTabChange("results")}
             className={cn(
               "text-xs font-semibold uppercase tracking-wider transition-colors text-center",
               activeTab === "results"
@@ -594,7 +596,7 @@ export function ResultsPanel({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("history")}
+            onClick={() => handleTabChange("history")}
             className={cn(
               "text-xs font-semibold uppercase tracking-wider transition-colors text-center",
               activeTab === "history"
@@ -625,6 +627,7 @@ export function ResultsPanel({
             onSelectEntry={onSelectHistoryEntry}
             onClearHistory={onClearHistory}
             disabled={disabled}
+            className="h-full"
           />
         </div>
       )}

@@ -356,6 +356,78 @@ pub struct PreprocessingHistoryEntry {
 pub const MAX_HISTORY_ENTRIES: usize = 10;
 
 // ============================================================================
+// PREPROCESSING UI STATE
+// ============================================================================
+
+/// UI state for the preprocessing page.
+///
+/// This captures the user's selections on the preprocessing page so they
+/// persist across navigation. Stored in memory only (session-only).
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::PreprocessingUIState`
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PreprocessingUIState {
+    /// Selected column names for preprocessing
+    pub selected_columns: Vec<String>,
+    /// Row range to process (start, end indices), or None for all rows
+    pub row_range: Option<(usize, usize)>,
+    /// Pipeline configuration settings
+    pub config: PreprocessingUIConfig,
+    /// Active tab in the results panel ("results" or "history")
+    pub active_results_tab: String,
+}
+
+/// Pipeline configuration for the preprocessing UI.
+///
+/// Mirrors the frontend PipelineConfigRequest type.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::PipelineConfigRequest`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreprocessingUIConfig {
+    /// Threshold for dropping columns with too many missing values (0.0-1.0)
+    pub missing_column_threshold: f64,
+    /// Threshold for dropping rows with too many missing values (0.0-1.0)
+    pub missing_row_threshold: f64,
+    /// Strategy for handling outliers
+    pub outlier_strategy: String,
+    /// Method for imputing numeric missing values
+    pub numeric_imputation: String,
+    /// Method for imputing categorical missing values
+    pub categorical_imputation: String,
+    /// Whether to enable type correction
+    pub enable_type_correction: bool,
+    /// Whether to remove duplicate rows
+    pub remove_duplicates: bool,
+    /// Number of neighbors for KNN imputation
+    pub knn_neighbors: usize,
+    /// Whether to use AI-guided decisions
+    pub use_ai_decisions: bool,
+    /// Target column for ML task detection
+    pub target_column: Option<String>,
+}
+
+impl Default for PreprocessingUIConfig {
+    fn default() -> Self {
+        Self {
+            missing_column_threshold: 0.7,
+            missing_row_threshold: 0.5,
+            outlier_strategy: "cap".to_string(),
+            numeric_imputation: "median".to_string(),
+            categorical_imputation: "mode".to_string(),
+            enable_type_correction: true,
+            remove_duplicates: true,
+            knn_neighbors: 5,
+            use_ai_decisions: true, // Smart mode on by default
+            target_column: None,
+        }
+    }
+}
+
+// ============================================================================
 // APPLICATION STATE
 // ============================================================================
 
@@ -426,6 +498,11 @@ pub struct AppState {
     /// Application theme setting (System, Light, or Dark).
     /// Defaults to System (follows OS preference).
     pub theme: RwLock<Theme>,
+
+    /// UI state for the preprocessing page.
+    /// Persists selected columns, row range, and config across navigation.
+    /// Session-only: not persisted to disk.
+    pub preprocessing_ui_state: RwLock<PreprocessingUIState>,
 }
 
 impl AppState {
@@ -440,6 +517,7 @@ impl AppState {
             processed_dataframe: RwLock::new(None),
             last_preprocessing_result: RwLock::new(None),
             theme: RwLock::new(Theme::default()),
+            preprocessing_ui_state: RwLock::new(PreprocessingUIState::default()),
         }
     }
 }
