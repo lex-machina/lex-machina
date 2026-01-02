@@ -1,0 +1,39 @@
+[package]
+name = "lex-learning"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Montaser Amoor"]
+description = "Automated ML training library with embedded Python runtime"
+license = "GPL-3.0"
+readme = "README.md"
+repository = "https://github.com/sshussh/lex-machina"
+keywords = ["machine-learning", "automl", "python", "pyo3", "training"]
+categories = ["science", "development-tools", "ai", "ml", "data processing", "data"]
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+# PyO3 for Python interop - provides Rust bindings to Python
+pyo3 = { version = "0.27", features = ["auto-initialize"] }
+
+# Polars for DataFrames - high-performance DataFrame library
+# Features:
+#   - lazy: Lazy evaluation for query optimization
+#   - dtype-full: All data types including categorical
+#   - ipc: Arrow IPC format for Python interop
+polars = { version = "0.51", features = ["lazy", "dtype-full", "ipc"] }
+
+# Error handling - derive macro for Error trait
+thiserror = "2.0"
+
+# Serialization - JSON handling for predictions and hyperparameters
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+# No build dependencies required - build.rs uses only std
+
+[dev-dependencies]
+# Testing dependencies would go here (e.g., tempfile, proptest)

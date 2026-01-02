@@ -1,0 +1,19 @@
+# Cargo configuration for lex-learning
+#
+# This file sets the PYO3_PYTHON environment variable to point to the bundled
+# Python interpreter, which PyO3 uses for building and linking.
+#
+# IMPORTANT: This configuration is set for the current development platform.
+# If you're building on a different platform, update the path below:
+#
+# | Platform              | Path                                          |
+# |-----------------------|-----------------------------------------------|
+# | Linux x86_64          | runtime/python/linux-x86_64/bin/python3.12    |
+# | Linux aarch64 (ARM64) | runtime/python/linux-aarch64/bin/python3.12   |
+# | macOS x86_64 (Intel)  | runtime/python/darwin-x86_64/bin/python3.12   |
+# | macOS aarch64 (M1/M2) | runtime/python/darwin-aarch64/bin/python3.12  |
+# | Windows x86_64        | runtime/python/windows-x86_64/python.exe      |
+
+[env]
+# Linux x86_64 configuration (default development platform)
+PYO3_PYTHON = { value = "runtime/python/linux-x86_64/bin/python3.12", relative = true }
