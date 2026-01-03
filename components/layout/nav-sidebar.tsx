@@ -31,7 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: "home",
     label: "Home",
-    href: "/",
+    href: "/home",
     icon: Home,
   },
   {
@@ -153,7 +153,10 @@ const NavSidebar = () => {
           <NavItemButton
             key={item.id}
             item={item}
-            isActive={pathname === item.href}
+            isActive={
+              pathname === item.href ||
+              (item.id === "home" && pathname === "/")
+            }
           />
         ))}
       </div>

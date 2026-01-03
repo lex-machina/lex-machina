@@ -81,6 +81,10 @@ pub fn run() {
         // Used by `open_file_dialog` command to show OS-native file picker.
         // Required permission in capabilities/default.json
         .plugin(tauri_plugin_dialog::init())
+        // Opener plugin: Opens URLs and files in the system's default application.
+        // Used for external links (e.g., GitHub) to open in the system browser.
+        // Required permission in capabilities/default.json
+        .plugin(tauri_plugin_opener::init())
         // ====================================================================
         // STATE MANAGEMENT
         // ====================================================================

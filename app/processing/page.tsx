@@ -27,6 +27,7 @@ import {
 
 import AppShell from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 
 import {
@@ -159,20 +160,20 @@ function LeftPanel({
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Column Selector - takes remaining space with internal scroll */}
-      <div className="flex-1 min-h-0 border rounded-lg overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Columns
-          </h3>
-          <ColumnSelectorHeader
-            totalCount={columns.length}
-            selectedCount={selectedColumns.length}
-            onSelectAll={handleSelectAll}
-            onDeselectAll={handleDeselectAll}
-            disabled={isProcessing}
-          />
-        </div>
-        <div className="flex-1 min-h-0 overflow-hidden">
+      <Card className="flex-1 min-h-0">
+        <CardHeader
+          title="Columns"
+          actions={
+            <ColumnSelectorHeader
+              totalCount={columns.length}
+              selectedCount={selectedColumns.length}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+              disabled={isProcessing}
+            />
+          }
+        />
+        <CardContent className="overflow-hidden">
           <ColumnSelector
             columns={columns}
             selectedColumns={selectedColumns}
@@ -181,28 +182,28 @@ function LeftPanel({
             hideHeader={true}
             className="h-full"
           />
-        </div>
+        </CardContent>
         {/* Warning when no columns selected */}
         {noColumnsSelected && columns.length > 0 && (
-          <div className="px-3 py-2 border-t bg-muted/30 flex items-center gap-2 text-xs text-muted-foreground">
+          <CardFooter className="flex items-center gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="size-3.5 shrink-0" />
             <span>Select at least one column to process</span>
-          </div>
+          </CardFooter>
         )}
-      </div>
+      </Card>
 
       {/* Row Range Selector - fixed at bottom */}
-      <div className="mt-3 border rounded-lg p-3 shrink-0">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Row Range
-        </h3>
-        <RowRangeSelector
-          totalRows={totalRows}
-          rowRange={rowRange}
-          onRangeChange={onRowRangeChange}
-          disabled={isProcessing}
-        />
-      </div>
+      <Card className="mt-3 shrink-0">
+        <CardHeader title="Row Range" />
+        <CardContent padded>
+          <RowRangeSelector
+            totalRows={totalRows}
+            rowRange={rowRange}
+            onRangeChange={onRowRangeChange}
+            disabled={isProcessing}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -229,13 +230,9 @@ function CenterPanel({
   isProcessing,
 }: CenterPanelProps) {
   return (
-    <div className="h-full min-h-0 border rounded-lg overflow-hidden flex flex-col">
-      <div className="px-3 py-2 border-b bg-muted/30">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Configuration
-        </h3>
-      </div>
-      <div className="flex-1 min-h-0 overflow-y-auto">
+    <Card className="h-full min-h-0">
+      <CardHeader title="Configuration" />
+      <CardContent scrollable>
         <ConfigPanel
           config={config}
           onConfigChange={onConfigChange}
@@ -244,8 +241,8 @@ function CenterPanel({
           hasAIProvider={hasAIProvider}
           disabled={isProcessing}
         />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 

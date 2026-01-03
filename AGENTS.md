@@ -185,6 +185,7 @@ pnpm lint                         # TypeScript linting
 
 - Adding logic in TypeScript (calculations, filtering, validation) - **use Rust**
 - Creating new UI components without checking `components/ui/` first
+- Creating page-specific components when a reusable one already exists in `components/ui/` or `components/layout/`
 - Using colorful styling (green/red/yellow badges) - **use muted colors**
 - Forgetting `"use client"` directive on components
 - Using `unwrap()` in Rust production code - **use proper error handling**
@@ -213,13 +214,65 @@ When adding new functionality, reference existing implementations:
 **Reference:** `events.rs` preprocessing events section
 
 ### Frontend Components
-1. **Check `components/ui/` first** - reuse existing primitives (button, input, select, checkbox, tabs, etc.)
-2. Create new components in `components/` with `"use client"`
-3. Use `invoke()` for commands, `useRustEvent()` for events
 
-**IMPORTANT:** Do NOT create duplicate UI components. Always check `components/ui/` for existing primitives before creating new ones.
+> **CRITICAL: Component Reuse is MANDATORY.** Before creating ANY component, you MUST verify it doesn't already exist. This is a top priority when working on the frontend.
 
-**Reference:** `components/settings/` (simple), `components/preprocessing/` (complex)
+**Search the `components/` directory thoroughly:**
+- `components/ui/` - Base/reusable primitives (Button, Input, Select, Tabs, etc.)
+- `components/layout/` - App-wide layout components (AppShell, ContextSidebar, NavSidebar, Toolbar, StatusBar)
+- `components/<page>/` - Page-specific components (home/, data-grid/, preprocessing/, settings/)
+
+```
+components/
+├── ui/              # Base primitives - used across multiple pages
+├── layout/          # App-wide layout structure
+├── home/            # Home page-specific
+├── data-grid/       # Data page-specific
+├── preprocessing/   # Processing page-specific
+└── settings/        # Settings page-specific
+```
+
+#### Decision Tree for New Components
+
+1. **Does the component already exist?**
+   - YES → **Use the existing component.** Do NOT create a duplicate.
+   - NO → Continue to step 2.
+
+2. **Is this a base/reusable component?** (buttons, inputs, cards, panels, modals, etc.)
+   - YES → Create in `components/ui/`
+   - NO → Continue to step 3.
+
+3. **Is this a page-specific component?** (only used in one page)
+   - YES → Create in `components/<page-name>/` (e.g., `components/home/`)
+   - NO → If it's layout-related, create in `components/layout/`
+
+4. **Does a similar component exist in another page's directory?**
+   - YES → **Move it to `components/ui/`**, update imports in the original page, then use it.
+   - NO → Create new component following the rules above.
+
+#### Examples
+
+| Scenario | Correct Action |
+|----------|---------------|
+| Need a sidebar for any page | Use `ContextSidebar` from `components/layout/` - do NOT create a custom `<aside>` with fixed width |
+| Need a button with loading state | Use `Button` from `components/ui/button` - do NOT create a new button component |
+| Need a file info card for home page, similar one exists in data page | Move the component to `components/ui/`, refactor data page imports, then use it |
+| Need a specialized config panel only for preprocessing | Create in `components/preprocessing/` |
+
+#### Why This Matters
+
+- **DRY (Don't Repeat Yourself)** - One source of truth for each component
+- **Consistency** - Same component behaves the same everywhere
+- **Maintainability** - Bug fixes and improvements apply globally
+- **Code Quality** - Smaller codebase, easier to understand
+
+#### Usage Pattern
+
+1. Use `"use client"` directive on all components
+2. Use `invoke()` for Tauri commands, `useRustEvent()` for events
+3. Use `cn()` from `@/lib/utils` for conditional class names
+
+**Reference:** `components/layout/context-sidebar.tsx` (resizable sidebar), `components/ui/button.tsx` (base primitive)
 
 ### Hooks
 **Reference:** `lib/hooks/use-settings.ts` (simple), `lib/hooks/use-preprocessing.ts` (complex)
