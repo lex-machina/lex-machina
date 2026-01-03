@@ -1,4 +1,21 @@
-// Preprocessing components barrel export
+// Processing page components barrel export
+
+// Context and Provider
+export { ProcessingProvider, useProcessingContext } from "./context";
+export type {
+    ProcessingContextValue,
+    ProcessingProviderProps,
+} from "./context";
+
+// Page layout components
+export { EmptyState } from "./empty-state";
+export { ProcessingToolbar } from "./toolbar";
+export { ColumnsPanel } from "./columns-panel";
+export { ConfigPanelWrapper } from "./config-panel-wrapper";
+export { ResultsPanelWrapper } from "./results-panel-wrapper";
+export { ProcessingLayout } from "./layout";
+
+// Reusable sub-components (moved from preprocessing/)
 export { ColumnSelector, ColumnSelectorHeader } from "./column-selector";
 export type {
     ColumnSelectorProps,
@@ -19,6 +36,3 @@ export type { ResultsPanelProps, ResultsTabValue } from "./results-panel";
 
 export { HistoryList } from "./history-list";
 export type { HistoryListProps } from "./history-list";
-
-export { DatasetPreview } from "./dataset-preview";
-export type { DatasetPreviewProps } from "./dataset-preview";

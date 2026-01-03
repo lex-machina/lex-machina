@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber, formatPercent, formatDuration } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { PreprocessingHistoryEntry } from "@/types";
 
@@ -51,31 +51,6 @@ function formatTimestamp(timestamp: number): string {
         hour: "2-digit",
         minute: "2-digit",
     });
-}
-
-/**
- * Format duration in human-readable format.
- */
-function formatDuration(ms: number): string {
-    if (ms < 1000) return `${ms}ms`;
-    const seconds = ms / 1000;
-    if (seconds < 60) return `${seconds.toFixed(1)}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes}m ${Math.round(seconds % 60)}s`;
-}
-
-/**
- * Format a number with locale-aware formatting.
- */
-function formatNumber(num: number): string {
-    return num.toLocaleString();
-}
-
-/**
- * Format a percentage (0-1 scale).
- */
-function formatPercent(value: number): string {
-    return `${Math.round(value * 100)}%`;
 }
 
 /**

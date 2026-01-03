@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import type { RowRange } from "@/types";
@@ -26,13 +26,6 @@ export interface RowRangeSelectorProps {
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-/**
- * Format a number with thousand separators.
- */
-function formatNumber(num: number): string {
-    return num.toLocaleString();
-}
 
 /**
  * Clamp a value between min and max.

@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber, formatPercent } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { HistoryList } from "@/components/preprocessing/history-list";
+import { HistoryList } from "./history-list";
 import type {
     PreprocessingSummary,
     PreprocessingAction,
@@ -48,20 +48,6 @@ export interface ResultsPanelProps {
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-/**
- * Format a number with locale-aware formatting.
- */
-function formatNumber(num: number): string {
-    return num.toLocaleString();
-}
-
-/**
- * Format a percentage (0-1 scale).
- */
-function formatPercent(value: number): string {
-    return `${Math.round(value * 100)}%`;
-}
 
 /**
  * Get the quality score color.
