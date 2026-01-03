@@ -3,22 +3,18 @@
 import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useRustEvent } from "./use-rust-event";
-import {
-  RUST_EVENTS,
-  type FileInfo,
-  type FileLoadedPayload,
-} from "@/types";
+import { RUST_EVENTS, type FileInfo, type FileLoadedPayload } from "@/types";
 
 /**
  * State returned by the useFileState hook.
  */
 export interface FileState {
-  /** Currently loaded file info, or null if no file is loaded */
-  fileInfo: FileInfo | null;
-  /** Whether a file is currently loaded */
-  isFileLoaded: boolean;
-  /** Column widths derived from file info */
-  columnWidths: number[];
+    /** Currently loaded file info, or null if no file is loaded */
+    fileInfo: FileInfo | null;
+    /** Whether a file is currently loaded */
+    isFileLoaded: boolean;
+    /** Column widths derived from file info */
+    columnWidths: number[];
 }
 
 /**
@@ -55,46 +51,46 @@ export interface FileState {
  * To load/close files, use Tauri commands directly (invoke("load_file"), invoke("close_file")).
  */
 export function useFileState(): FileState {
-  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
+    const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
 
-  // Query Rust for current file state on mount
-  // This ensures we sync with Rust state when component mounts
-  // (e.g., after navigation or if event was missed)
-  useEffect(() => {
-    const fetchInitialState = async () => {
-      try {
-        const info = await invoke<FileInfo | null>("get_file_info");
-        if (info) {
-          setFileInfo(info);
-        }
-      } catch (err) {
-        console.error("Failed to get initial file state:", err);
-      }
+    // Query Rust for current file state on mount
+    // This ensures we sync with Rust state when component mounts
+    // (e.g., after navigation or if event was missed)
+    useEffect(() => {
+        const fetchInitialState = async () => {
+            try {
+                const info = await invoke<FileInfo | null>("get_file_info");
+                if (info) {
+                    setFileInfo(info);
+                }
+            } catch (err) {
+                console.error("Failed to get initial file state:", err);
+            }
+        };
+        fetchInitialState();
+    }, []);
+
+    // Handle file loaded event
+    const handleFileLoaded = useCallback((payload: FileLoadedPayload) => {
+        setFileInfo(payload.file_info);
+    }, []);
+
+    // Handle file closed event
+    const handleFileClosed = useCallback(() => {
+        setFileInfo(null);
+    }, []);
+
+    // Subscribe to file events
+    useRustEvent<FileLoadedPayload>(RUST_EVENTS.FILE_LOADED, handleFileLoaded);
+    useRustEvent<null>(RUST_EVENTS.FILE_CLOSED, handleFileClosed);
+
+    // Derive computed values
+    const isFileLoaded = fileInfo !== null;
+    const columnWidths = fileInfo?.columns.map((col) => col.width) ?? [];
+
+    return {
+        fileInfo,
+        isFileLoaded,
+        columnWidths,
     };
-    fetchInitialState();
-  }, []);
-
-  // Handle file loaded event
-  const handleFileLoaded = useCallback((payload: FileLoadedPayload) => {
-    setFileInfo(payload.file_info);
-  }, []);
-
-  // Handle file closed event
-  const handleFileClosed = useCallback(() => {
-    setFileInfo(null);
-  }, []);
-
-  // Subscribe to file events
-  useRustEvent<FileLoadedPayload>(RUST_EVENTS.FILE_LOADED, handleFileLoaded);
-  useRustEvent<null>(RUST_EVENTS.FILE_CLOSED, handleFileClosed);
-
-  // Derive computed values
-  const isFileLoaded = fileInfo !== null;
-  const columnWidths = fileInfo?.columns.map((col) => col.width) ?? [];
-
-  return {
-    fileInfo,
-    isFileLoaded,
-    columnWidths,
-  };
 }

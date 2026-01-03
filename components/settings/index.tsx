@@ -17,6 +17,6 @@
 
 export { ThemeSelector, type ThemeSelectorProps } from "./theme-selector";
 export {
-  AIProviderConfig,
-  type AIProviderConfigProps,
+    AIProviderConfig,
+    type AIProviderConfigProps,
 } from "./ai-provider-config";

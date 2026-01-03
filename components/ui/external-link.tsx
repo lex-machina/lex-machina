@@ -8,12 +8,12 @@ import { openExternalUrl, cn } from "@/lib/utils";
 // ============================================================================
 
 interface ExternalLinkProps {
-  /** The URL to open in the system browser */
-  href: string;
-  /** Content to render inside the link */
-  children: ReactNode;
-  /** Additional CSS classes */
-  className?: string;
+    /** The URL to open in the system browser */
+    href: string;
+    /** Content to render inside the link */
+    children: ReactNode;
+    /** Additional CSS classes */
+    className?: string;
 }
 
 // ============================================================================
@@ -34,20 +34,20 @@ interface ExternalLinkProps {
  * ```
  */
 const ExternalLink = ({ href, children, className }: ExternalLinkProps) => {
-  const handleClick = async (e: MouseEvent) => {
-    e.preventDefault();
-    try {
-      await openExternalUrl(href);
-    } catch (error) {
-      console.error("Failed to open external URL:", error);
-    }
-  };
+    const handleClick = async (e: MouseEvent) => {
+        e.preventDefault();
+        try {
+            await openExternalUrl(href);
+        } catch (error) {
+            console.error("Failed to open external URL:", error);
+        }
+    };
 
-  return (
-    <button type="button" onClick={handleClick} className={cn(className)}>
-      {children}
-    </button>
-  );
+    return (
+        <button type="button" onClick={handleClick} className={cn(className)}>
+            {children}
+        </button>
+    );
 };
 
 export default ExternalLink;

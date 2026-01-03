@@ -1,17 +1,17 @@
 export interface ColumnInfo {
-  name: string;
-  dtype: string;
-  null_count: number;
-  width: number;
+    name: string;
+    dtype: string;
+    null_count: number;
+    width: number;
 }
 
 export interface FileInfo {
-  path: string;
-  name: string;
-  size_bytes: number;
-  row_count: number;
-  column_count: number;
-  columns: ColumnInfo[];
+    path: string;
+    name: string;
+    size_bytes: number;
+    row_count: number;
+    column_count: number;
+    columns: ColumnInfo[];
 }
 
 export type CellValue = string | number | boolean | null;
@@ -19,9 +19,9 @@ export type CellValue = string | number | boolean | null;
 export type Row = CellValue[];
 
 export interface RowsResponse {
-  rows: CellValue[][];
-  start: number;
-  total_rows: number;
+    rows: CellValue[][];
+    start: number;
+    total_rows: number;
 }
 
 // ============================================================================
@@ -33,22 +33,22 @@ export interface RowsResponse {
  * These must match the constants in src-tauri/src/events.rs
  */
 export const RUST_EVENTS = {
-  // File events
-  FILE_LOADED: "file:loaded",
-  FILE_CLOSED: "file:closed",
+    // File events
+    FILE_LOADED: "file:loaded",
+    FILE_CLOSED: "file:closed",
 
-  // App events
-  LOADING: "app:loading",
-  ERROR: "app:error",
+    // App events
+    LOADING: "app:loading",
+    ERROR: "app:error",
 
-  // Preprocessing events
-  PREPROCESSING_PROGRESS: "preprocessing:progress",
-  PREPROCESSING_COMPLETE: "preprocessing:complete",
-  PREPROCESSING_ERROR: "preprocessing:error",
-  PREPROCESSING_CANCELLED: "preprocessing:cancelled",
+    // Preprocessing events
+    PREPROCESSING_PROGRESS: "preprocessing:progress",
+    PREPROCESSING_COMPLETE: "preprocessing:complete",
+    PREPROCESSING_ERROR: "preprocessing:error",
+    PREPROCESSING_CANCELLED: "preprocessing:cancelled",
 
-  // Settings events
-  THEME_CHANGED: "settings:theme-changed",
+    // Settings events
+    THEME_CHANGED: "settings:theme-changed",
 } as const;
 
 export type RustEventName = (typeof RUST_EVENTS)[keyof typeof RUST_EVENTS];
@@ -58,7 +58,7 @@ export type RustEventName = (typeof RUST_EVENTS)[keyof typeof RUST_EVENTS];
  * Mirrors: events.rs::FileLoadedPayload
  */
 export interface FileLoadedPayload {
-  file_info: FileInfo;
+    file_info: FileInfo;
 }
 
 /**
@@ -66,8 +66,8 @@ export interface FileLoadedPayload {
  * Mirrors: events.rs::LoadingPayload
  */
 export interface LoadingPayload {
-  is_loading: boolean;
-  message: string | null;
+    is_loading: boolean;
+    message: string | null;
 }
 
 /**
@@ -75,8 +75,8 @@ export interface LoadingPayload {
  * Mirrors: events.rs::ErrorPayload
  */
 export interface ErrorPayload {
-  code: string;
-  message: string;
+    code: string;
+    message: string;
 }
 
 /**
@@ -84,8 +84,8 @@ export interface ErrorPayload {
  * Mirrors: events.rs::PreprocessingErrorPayload
  */
 export interface PreprocessingErrorPayload {
-  code: string;
-  message: string;
+    code: string;
+    message: string;
 }
 
 /**
@@ -93,25 +93,25 @@ export interface PreprocessingErrorPayload {
  * Mirrors: events.rs::error_codes
  */
 export const ERROR_CODES = {
-  // File error codes
-  FILE_NOT_FOUND: "FILE_NOT_FOUND",
-  FILE_READ_ERROR: "FILE_READ_ERROR",
-  FILE_PARSE_ERROR: "FILE_PARSE_ERROR",
-  FILE_METADATA_ERROR: "FILE_METADATA_ERROR",
-  UNKNOWN_ERROR: "UNKNOWN_ERROR",
+    // File error codes
+    FILE_NOT_FOUND: "FILE_NOT_FOUND",
+    FILE_READ_ERROR: "FILE_READ_ERROR",
+    FILE_PARSE_ERROR: "FILE_PARSE_ERROR",
+    FILE_METADATA_ERROR: "FILE_METADATA_ERROR",
+    UNKNOWN_ERROR: "UNKNOWN_ERROR",
 
-  // Preprocessing error codes
-  PREPROCESSING_CANCELLED: "CANCELLED",
-  PREPROCESSING_NO_DATA: "NO_DATA_LOADED",
-  PREPROCESSING_INVALID_CONFIG: "INVALID_CONFIG",
-  PREPROCESSING_COLUMN_NOT_FOUND: "COLUMN_NOT_FOUND",
-  PREPROCESSING_AI_ERROR: "AI_CLIENT_ERROR",
-  PREPROCESSING_POLARS_ERROR: "POLARS_ERROR",
-  PREPROCESSING_INTERNAL_ERROR: "INTERNAL_ERROR",
+    // Preprocessing error codes
+    PREPROCESSING_CANCELLED: "CANCELLED",
+    PREPROCESSING_NO_DATA: "NO_DATA_LOADED",
+    PREPROCESSING_INVALID_CONFIG: "INVALID_CONFIG",
+    PREPROCESSING_COLUMN_NOT_FOUND: "COLUMN_NOT_FOUND",
+    PREPROCESSING_AI_ERROR: "AI_CLIENT_ERROR",
+    PREPROCESSING_POLARS_ERROR: "POLARS_ERROR",
+    PREPROCESSING_INTERNAL_ERROR: "INTERNAL_ERROR",
 
-  // Settings error codes
-  SETTINGS_INVALID_PROVIDER: "INVALID_PROVIDER",
-  SETTINGS_INVALID_API_KEY: "INVALID_API_KEY",
+    // Settings error codes
+    SETTINGS_INVALID_PROVIDER: "INVALID_PROVIDER",
+    SETTINGS_INVALID_API_KEY: "INVALID_API_KEY",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -125,8 +125,8 @@ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
  * Mirrors: state.rs::GridScrollPosition
  */
 export interface GridScrollPosition {
-  row_index: number;
-  scroll_left: number;
+    row_index: number;
+    scroll_left: number;
 }
 
 /**
@@ -134,9 +134,9 @@ export interface GridScrollPosition {
  * Mirrors: state.rs::UIState
  */
 export interface UIState {
-  sidebar_width: number;
-  column_widths: number[];
-  grid_scroll: GridScrollPosition;
+    sidebar_width: number;
+    column_widths: number[];
+    grid_scroll: GridScrollPosition;
 }
 
 // ============================================================================
@@ -154,8 +154,8 @@ export type AIProviderType = "none" | "openrouter" | "gemini";
  * Mirrors: state.rs::AIProviderConfig
  */
 export interface AIProviderConfig {
-  provider: AIProviderType;
-  api_key: string;
+    provider: AIProviderType;
+    api_key: string;
 }
 
 /**
@@ -191,34 +191,34 @@ export type CategoricalImputation = "mode" | "constant" | "drop";
  * Mirrors: preprocessing.rs::PipelineConfigRequest
  */
 export interface PipelineConfigRequest {
-  /** Threshold for dropping columns with too many missing values (0.0-1.0) */
-  missing_column_threshold: number;
-  /** Threshold for dropping rows with too many missing values (0.0-1.0) */
-  missing_row_threshold: number;
-  /** Strategy for handling outliers */
-  outlier_strategy: OutlierStrategy;
-  /** Method for imputing numeric values */
-  numeric_imputation: NumericImputation;
-  /** Method for imputing categorical values */
-  categorical_imputation: CategoricalImputation;
-  /** Whether to enable automatic type correction */
-  enable_type_correction: boolean;
-  /** Whether to remove duplicate rows */
-  remove_duplicates: boolean;
-  /** Number of neighbors for KNN imputation */
-  knn_neighbors: number;
-  /** Whether to use AI for preprocessing decisions */
-  use_ai_decisions: boolean;
-  /** Optional target column for ML task detection */
-  target_column: string | null;
+    /** Threshold for dropping columns with too many missing values (0.0-1.0) */
+    missing_column_threshold: number;
+    /** Threshold for dropping rows with too many missing values (0.0-1.0) */
+    missing_row_threshold: number;
+    /** Strategy for handling outliers */
+    outlier_strategy: OutlierStrategy;
+    /** Method for imputing numeric values */
+    numeric_imputation: NumericImputation;
+    /** Method for imputing categorical values */
+    categorical_imputation: CategoricalImputation;
+    /** Whether to enable automatic type correction */
+    enable_type_correction: boolean;
+    /** Whether to remove duplicate rows */
+    remove_duplicates: boolean;
+    /** Number of neighbors for KNN imputation */
+    knn_neighbors: number;
+    /** Whether to use AI for preprocessing decisions */
+    use_ai_decisions: boolean;
+    /** Optional target column for ML task detection */
+    target_column: string | null;
 }
 
 /**
  * Row range for preprocessing a subset of data.
  */
 export interface RowRange {
-  start: number;
-  end: number;
+    start: number;
+    end: number;
 }
 
 /**
@@ -226,12 +226,12 @@ export interface RowRange {
  * Mirrors: preprocessing.rs::PreprocessingRequest
  */
 export interface PreprocessingRequest {
-  /** Columns selected for preprocessing (empty = all columns) */
-  selected_columns: string[];
-  /** Optional row range to process (start, end indices) */
-  row_range: [number, number] | null;
-  /** Pipeline configuration options */
-  config: PipelineConfigRequest;
+    /** Columns selected for preprocessing (empty = all columns) */
+    selected_columns: string[];
+    /** Optional row range to process (start, end indices) */
+    row_range: [number, number] | null;
+    /** Pipeline configuration options */
+    config: PipelineConfigRequest;
 }
 
 // ============================================================================
@@ -243,30 +243,30 @@ export interface PreprocessingRequest {
  * Mirrors: state.rs::PreprocessingConfigSnapshot
  */
 export interface PreprocessingConfigSnapshot {
-  /** Columns that were selected for preprocessing */
-  selected_columns: string[];
-  /** Row range that was processed (start, end indices) */
-  row_range: [number, number] | null;
-  /** Threshold for dropping columns with too many missing values (0.0-1.0) */
-  missing_column_threshold: number;
-  /** Threshold for dropping rows with too many missing values (0.0-1.0) */
-  missing_row_threshold: number;
-  /** Strategy used for handling outliers */
-  outlier_strategy: string;
-  /** Method used for imputing numeric missing values */
-  numeric_imputation: string;
-  /** Method used for imputing categorical missing values */
-  categorical_imputation: string;
-  /** Whether type correction was enabled */
-  enable_type_correction: boolean;
-  /** Whether duplicate removal was enabled */
-  remove_duplicates: boolean;
-  /** Number of neighbors used for KNN imputation */
-  knn_neighbors: number;
-  /** Whether AI-guided decisions were used */
-  use_ai_decisions: boolean;
-  /** Target column if specified */
-  target_column: string | null;
+    /** Columns that were selected for preprocessing */
+    selected_columns: string[];
+    /** Row range that was processed (start, end indices) */
+    row_range: [number, number] | null;
+    /** Threshold for dropping columns with too many missing values (0.0-1.0) */
+    missing_column_threshold: number;
+    /** Threshold for dropping rows with too many missing values (0.0-1.0) */
+    missing_row_threshold: number;
+    /** Strategy used for handling outliers */
+    outlier_strategy: string;
+    /** Method used for imputing numeric missing values */
+    numeric_imputation: string;
+    /** Method used for imputing categorical missing values */
+    categorical_imputation: string;
+    /** Whether type correction was enabled */
+    enable_type_correction: boolean;
+    /** Whether duplicate removal was enabled */
+    remove_duplicates: boolean;
+    /** Number of neighbors used for KNN imputation */
+    knn_neighbors: number;
+    /** Whether AI-guided decisions were used */
+    use_ai_decisions: boolean;
+    /** Target column if specified */
+    target_column: string | null;
 }
 
 /**
@@ -274,14 +274,14 @@ export interface PreprocessingConfigSnapshot {
  * Mirrors: state.rs::PreprocessingHistoryEntry
  */
 export interface PreprocessingHistoryEntry {
-  /** Unique identifier for this history entry (UUID) */
-  id: string;
-  /** Unix timestamp when preprocessing was completed */
-  timestamp: number;
-  /** Configuration used for this preprocessing run */
-  config: PreprocessingConfigSnapshot;
-  /** Summary of what the preprocessing accomplished */
-  summary: PreprocessingSummary;
+    /** Unique identifier for this history entry (UUID) */
+    id: string;
+    /** Unix timestamp when preprocessing was completed */
+    timestamp: number;
+    /** Configuration used for this preprocessing run */
+    config: PreprocessingConfigSnapshot;
+    /** Summary of what the preprocessing accomplished */
+    summary: PreprocessingSummary;
 }
 
 // ============================================================================
@@ -293,32 +293,32 @@ export interface PreprocessingHistoryEntry {
  * Mirrors: types.rs::ActionType
  */
 export type ActionType =
-  | "column_removed"
-  | "rows_removed"
-  | "type_corrected"
-  | "value_imputed"
-  | "outlier_handled"
-  | "duplicates_removed"
-  | "target_identified"
-  | "problem_type_detected"
-  | "column_renamed"
-  | "value_cleaned"
-  | "data_normalized"
-  | "categories_encoded";
+    | "column_removed"
+    | "rows_removed"
+    | "type_corrected"
+    | "value_imputed"
+    | "outlier_handled"
+    | "duplicates_removed"
+    | "target_identified"
+    | "problem_type_detected"
+    | "column_renamed"
+    | "value_cleaned"
+    | "data_normalized"
+    | "categories_encoded";
 
 /**
  * A single action taken during preprocessing.
  * Mirrors: types.rs::PreprocessingAction
  */
 export interface PreprocessingAction {
-  /** Type of action performed */
-  action_type: ActionType;
-  /** Target of the action (column name or "dataset") */
-  target: string;
-  /** Human-readable description of the action */
-  description: string;
-  /** Additional details (e.g., values replaced, strategy used) */
-  details?: string;
+    /** Type of action performed */
+    action_type: ActionType;
+    /** Target of the action (column name or "dataset") */
+    target: string;
+    /** Human-readable description of the action */
+    description: string;
+    /** Additional details (e.g., values replaced, strategy used) */
+    details?: string;
 }
 
 /**
@@ -326,28 +326,28 @@ export interface PreprocessingAction {
  * Mirrors: types.rs::ColumnSummary
  */
 export interface ColumnSummary {
-  /** Name of the column */
-  name: string;
-  /** Original data type (as string) */
-  original_type: string;
-  /** Final data type after preprocessing */
-  final_type: string;
-  /** Number of missing values before preprocessing */
-  missing_before: number;
-  /** Number of missing values after preprocessing */
-  missing_after: number;
-  /** Imputation method used, if any */
-  imputation_method?: string;
-  /** Number of outliers handled */
-  outliers_handled: number;
-  /** Number of type corrections made */
-  type_corrections: number;
-  /** Number of invalid values cleaned */
-  values_cleaned: number;
-  /** Whether the column was removed */
-  was_removed: boolean;
-  /** Reason for removal, if removed */
-  removal_reason?: string;
+    /** Name of the column */
+    name: string;
+    /** Original data type (as string) */
+    original_type: string;
+    /** Final data type after preprocessing */
+    final_type: string;
+    /** Number of missing values before preprocessing */
+    missing_before: number;
+    /** Number of missing values after preprocessing */
+    missing_after: number;
+    /** Imputation method used, if any */
+    imputation_method?: string;
+    /** Number of outliers handled */
+    outliers_handled: number;
+    /** Number of type corrections made */
+    type_corrections: number;
+    /** Number of invalid values cleaned */
+    values_cleaned: number;
+    /** Whether the column was removed */
+    was_removed: boolean;
+    /** Reason for removal, if removed */
+    removal_reason?: string;
 }
 
 /**
@@ -355,34 +355,34 @@ export interface ColumnSummary {
  * Mirrors: types.rs::PreprocessingSummary
  */
 export interface PreprocessingSummary {
-  /** Total execution time in milliseconds */
-  duration_ms: number;
-  /** Number of rows before preprocessing */
-  rows_before: number;
-  /** Number of rows after preprocessing */
-  rows_after: number;
-  /** Number of rows removed during preprocessing */
-  rows_removed: number;
-  /** Number of columns before preprocessing */
-  columns_before: number;
-  /** Number of columns after preprocessing */
-  columns_after: number;
-  /** Number of columns removed during preprocessing */
-  columns_removed: number;
-  /** Number of data quality issues found */
-  issues_found: number;
-  /** Number of issues resolved by preprocessing */
-  issues_resolved: number;
-  /** Data quality score before preprocessing (0.0 - 1.0) */
-  data_quality_score_before: number;
-  /** Data quality score after preprocessing (0.0 - 1.0) */
-  data_quality_score_after: number;
-  /** List of actions taken during preprocessing */
-  actions: PreprocessingAction[];
-  /** Per-column summaries of changes */
-  column_summaries: ColumnSummary[];
-  /** Warnings and notes generated during preprocessing */
-  warnings: string[];
+    /** Total execution time in milliseconds */
+    duration_ms: number;
+    /** Number of rows before preprocessing */
+    rows_before: number;
+    /** Number of rows after preprocessing */
+    rows_after: number;
+    /** Number of rows removed during preprocessing */
+    rows_removed: number;
+    /** Number of columns before preprocessing */
+    columns_before: number;
+    /** Number of columns after preprocessing */
+    columns_after: number;
+    /** Number of columns removed during preprocessing */
+    columns_removed: number;
+    /** Number of data quality issues found */
+    issues_found: number;
+    /** Number of issues resolved by preprocessing */
+    issues_resolved: number;
+    /** Data quality score before preprocessing (0.0 - 1.0) */
+    data_quality_score_before: number;
+    /** Data quality score after preprocessing (0.0 - 1.0) */
+    data_quality_score_after: number;
+    /** List of actions taken during preprocessing */
+    actions: PreprocessingAction[];
+    /** Per-column summaries of changes */
+    column_summaries: ColumnSummary[];
+    /** Warnings and notes generated during preprocessing */
+    warnings: string[];
 }
 
 // ============================================================================
@@ -394,38 +394,38 @@ export interface PreprocessingSummary {
  * Mirrors: progress.rs::PreprocessingStage
  */
 export type PreprocessingStage =
-  | "initializing"
-  | "profiling"
-  | "quality_analysis"
-  | "type_correction"
-  | "decision_making"
-  | "cleaning"
-  | "imputation"
-  | "outlier_handling"
-  | "report_generation"
-  | "complete"
-  | "cancelled"
-  | "failed";
+    | "initializing"
+    | "profiling"
+    | "quality_analysis"
+    | "type_correction"
+    | "decision_making"
+    | "cleaning"
+    | "imputation"
+    | "outlier_handling"
+    | "report_generation"
+    | "complete"
+    | "cancelled"
+    | "failed";
 
 /**
  * Detailed progress update with sub-stage information.
  * Mirrors: progress.rs::ProgressUpdate
  */
 export interface ProgressUpdate {
-  /** Current pipeline stage */
-  stage: PreprocessingStage;
-  /** Optional sub-stage description (e.g., "Column: Age", "Row batch 1/10") */
-  sub_stage?: string;
-  /** Overall progress (0.0 - 1.0) */
-  progress: number;
-  /** Progress within current stage (0.0 - 1.0) */
-  stage_progress: number;
-  /** Human-readable message describing current activity */
-  message: string;
-  /** Number of items processed in current stage (for iterative operations) */
-  items_processed?: number;
-  /** Total items in current stage (for iterative operations) */
-  items_total?: number;
+    /** Current pipeline stage */
+    stage: PreprocessingStage;
+    /** Optional sub-stage description (e.g., "Column: Age", "Row batch 1/10") */
+    sub_stage?: string;
+    /** Overall progress (0.0 - 1.0) */
+    progress: number;
+    /** Progress within current stage (0.0 - 1.0) */
+    stage_progress: number;
+    /** Human-readable message describing current activity */
+    message: string;
+    /** Number of items processed in current stage (for iterative operations) */
+    items_processed?: number;
+    /** Total items in current stage (for iterative operations) */
+    items_total?: number;
 }
 
 // ============================================================================
@@ -437,26 +437,26 @@ export interface ProgressUpdate {
  * Mirrors: types.rs::PipelineResult (without DataFrame which can't be serialized)
  */
 export interface PipelineResult {
-  /** Whether preprocessing completed successfully */
-  success: boolean;
-  /** Path to the saved cleaned data file (if written to disk) */
-  cleaned_data_path?: string;
-  /** Target column if identified */
-  target_column?: string;
-  /** Problem type if detected (e.g., "binary_classification", "regression") */
-  problem_type?: string;
-  /** AI choices made during preprocessing */
-  ai_choices: Record<string, string>;
-  /** Path to the analysis report (if generated) */
-  analysis_report?: string;
-  /** List of processing steps performed */
-  processing_steps: string[];
-  /** List of cleaning actions taken */
-  cleaning_actions: string[];
-  /** Error message if preprocessing failed */
-  error?: string;
-  /** Detailed summary of preprocessing actions */
-  summary?: PreprocessingSummary;
+    /** Whether preprocessing completed successfully */
+    success: boolean;
+    /** Path to the saved cleaned data file (if written to disk) */
+    cleaned_data_path?: string;
+    /** Target column if identified */
+    target_column?: string;
+    /** Problem type if detected (e.g., "binary_classification", "regression") */
+    problem_type?: string;
+    /** AI choices made during preprocessing */
+    ai_choices: Record<string, string>;
+    /** Path to the analysis report (if generated) */
+    analysis_report?: string;
+    /** List of processing steps performed */
+    processing_steps: string[];
+    /** List of cleaning actions taken */
+    cleaning_actions: string[];
+    /** Error message if preprocessing failed */
+    error?: string;
+    /** Detailed summary of preprocessing actions */
+    summary?: PreprocessingSummary;
 }
 
 /**
@@ -464,9 +464,9 @@ export interface PipelineResult {
  * Mirrors: preprocessing.rs::ProcessedRowsResponse
  */
 export interface ProcessedRowsResponse {
-  rows: CellValue[][];
-  start: number;
-  total_rows: number;
+    rows: CellValue[][];
+    start: number;
+    total_rows: number;
 }
 
 /**
@@ -474,10 +474,10 @@ export interface ProcessedRowsResponse {
  * Mirrors: preprocessing.rs::ExportResult
  */
 export interface ExportResult {
-  /** Path to the exported CSV file */
-  csv_path: string;
-  /** Path to the exported JSON report file */
-  report_path: string;
+    /** Path to the exported CSV file */
+    csv_path: string;
+    /** Path to the exported JSON report file */
+    report_path: string;
 }
 
 // ============================================================================
@@ -512,14 +512,14 @@ export type ThemeChangedPayload = Theme;
  * Mirrors: state.rs::PreprocessingUIState
  */
 export interface PreprocessingUIState {
-  /** Selected column names for preprocessing */
-  selected_columns: string[];
-  /** Row range to process (start, end indices), or null for all rows */
-  row_range: [number, number] | null;
-  /** Pipeline configuration settings */
-  config: PipelineConfigRequest;
-  /** Active tab in the results panel ("results" or "history") */
-  active_results_tab: "results" | "history";
+    /** Selected column names for preprocessing */
+    selected_columns: string[];
+    /** Row range to process (start, end indices), or null for all rows */
+    row_range: [number, number] | null;
+    /** Pipeline configuration settings */
+    config: PipelineConfigRequest;
+    /** Active tab in the results panel ("results" or "history") */
+    active_results_tab: "results" | "history";
 }
 
 // ============================================================================
@@ -531,14 +531,14 @@ export interface PreprocessingUIState {
  * Use these when creating a new preprocessing request.
  */
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfigRequest = {
-  missing_column_threshold: 0.7,
-  missing_row_threshold: 0.5,
-  outlier_strategy: "cap",
-  numeric_imputation: "median",
-  categorical_imputation: "mode",
-  enable_type_correction: true,
-  remove_duplicates: true,
-  knn_neighbors: 5,
-  use_ai_decisions: true, // AI-powered "Smart Mode" is ON by default for non-technical users
-  target_column: null,
+    missing_column_threshold: 0.7,
+    missing_row_threshold: 0.5,
+    outlier_strategy: "cap",
+    numeric_imputation: "median",
+    categorical_imputation: "mode",
+    enable_type_correction: true,
+    remove_duplicates: true,
+    knn_neighbors: 5,
+    use_ai_decisions: true, // AI-powered "Smart Mode" is ON by default for non-technical users
+    target_column: null,
 };

@@ -11,13 +11,13 @@ import { useRouter } from "next/navigation";
  * (e.g., to /login if not authenticated, or /home if authenticated).
  */
 export default function RootPage() {
-  const router = useRouter();
+    const router = useRouter();
 
-  useEffect(() => {
-    router.replace("/home");
-  }, [router]);
+    useEffect(() => {
+        router.replace("/home");
+    }, [router]);
 
-  // Return null while redirecting - this is a client-side desktop app
-  // so there's no flash of content to worry about
-  return null;
+    // Return null while redirecting - this is a client-side desktop app
+    // so there's no flash of content to worry about
+    return null;
 }

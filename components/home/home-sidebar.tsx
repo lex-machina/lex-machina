@@ -11,28 +11,28 @@ import type { FileInfo, AIProviderType } from "@/types";
 // ============================================================================
 
 interface StartSectionProps {
-  onOpenDataset: () => void;
+    onOpenDataset: () => void;
 }
 
 /**
  * Start section with the primary "Open Dataset" action.
  */
 const StartSection = ({ onOpenDataset }: StartSectionProps) => {
-  return (
-    <Card>
-      <CardHeader title="Start" />
-      <CardContent padded>
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 h-8 px-2 text-sm -mx-2"
-          onClick={onOpenDataset}
-        >
-          <FolderOpen className="w-4 h-4" />
-          Open Dataset
-        </Button>
-      </CardContent>
-    </Card>
-  );
+    return (
+        <Card>
+            <CardHeader title="Start" />
+            <CardContent padded>
+                <Button
+                    variant="ghost"
+                    className="-mx-2 h-8 w-full justify-start gap-2 px-2 text-sm"
+                    onClick={onOpenDataset}
+                >
+                    <FolderOpen className="h-4 w-4" />
+                    Open Dataset
+                </Button>
+            </CardContent>
+        </Card>
+    );
 };
 
 // ============================================================================
@@ -40,57 +40,60 @@ const StartSection = ({ onOpenDataset }: StartSectionProps) => {
 // ============================================================================
 
 interface CurrentFileSectionProps {
-  fileInfo: FileInfo | null;
-  onClose: () => void;
+    fileInfo: FileInfo | null;
+    onClose: () => void;
 }
 
 /**
  * Current file section showing the loaded dataset info or empty state.
  */
 const CurrentFileSection = ({ fileInfo, onClose }: CurrentFileSectionProps) => {
-  if (!fileInfo) {
-    return (
-      <Card>
-        <CardHeader title="Current" />
-        <CardContent padded>
-          <p className="text-sm text-muted-foreground">No file loaded</p>
-        </CardContent>
-      </Card>
-    );
-  }
+    if (!fileInfo) {
+        return (
+            <Card>
+                <CardHeader title="Current" />
+                <CardContent padded>
+                    <p className="text-muted-foreground text-sm">
+                        No file loaded
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
 
-  return (
-    <Card>
-      <CardHeader
-        title="Current"
-        actions={
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            title="Close file"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        }
-      />
-      <CardContent padded>
-        <div className="min-w-0">
-          <p
-            className="text-sm font-medium truncate"
-            title={fileInfo.name}
-          >
-            {fileInfo.name}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {fileInfo.row_count.toLocaleString()} rows · {fileInfo.column_count} cols
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formatBytes(fileInfo.size_bytes)}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+    return (
+        <Card>
+            <CardHeader
+                title="Current"
+                actions={
+                    <button
+                        onClick={onClose}
+                        className="hover:bg-muted text-muted-foreground hover:text-foreground rounded p-1 transition-colors"
+                        title="Close file"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                }
+            />
+            <CardContent padded>
+                <div className="min-w-0">
+                    <p
+                        className="truncate text-sm font-medium"
+                        title={fileInfo.name}
+                    >
+                        {fileInfo.name}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                        {fileInfo.row_count.toLocaleString()} rows ·{" "}
+                        {fileInfo.column_count} cols
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                        {formatBytes(fileInfo.size_bytes)}
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+    );
 };
 
 // ============================================================================
@@ -98,44 +101,46 @@ const CurrentFileSection = ({ fileInfo, onClose }: CurrentFileSectionProps) => {
 // ============================================================================
 
 interface StatusSectionProps {
-  aiProvider: AIProviderType;
+    aiProvider: AIProviderType;
 }
 
 /**
  * Status section showing AI provider status.
  */
 const StatusSection = ({ aiProvider }: StatusSectionProps) => {
-  const getProviderLabel = (provider: AIProviderType): string => {
-    switch (provider) {
-      case "openrouter":
-        return "OpenRouter";
-      case "gemini":
-        return "Gemini";
-      case "none":
-      default:
-        return "Off";
-    }
-  };
+    const getProviderLabel = (provider: AIProviderType): string => {
+        switch (provider) {
+            case "openrouter":
+                return "OpenRouter";
+            case "gemini":
+                return "Gemini";
+            case "none":
+            default:
+                return "Off";
+        }
+    };
 
-  return (
-    <Card>
-      <CardHeader title="Status" />
-      <CardContent padded>
-        <div className="text-xs text-muted-foreground space-y-1">
-          <div className="flex items-center justify-between">
-            <span>AI</span>
-            <span
-              className={cn(
-                aiProvider !== "none" ? "text-foreground" : "text-muted-foreground"
-              )}
-            >
-              {getProviderLabel(aiProvider)}
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+    return (
+        <Card>
+            <CardHeader title="Status" />
+            <CardContent padded>
+                <div className="text-muted-foreground space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                        <span>AI</span>
+                        <span
+                            className={cn(
+                                aiProvider !== "none"
+                                    ? "text-foreground"
+                                    : "text-muted-foreground",
+                            )}
+                        >
+                            {getProviderLabel(aiProvider)}
+                        </span>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
 };
 
 // ============================================================================
@@ -143,10 +148,10 @@ const StatusSection = ({ aiProvider }: StatusSectionProps) => {
 // ============================================================================
 
 interface HomeSidebarContentProps {
-  fileInfo: FileInfo | null;
-  aiProvider: AIProviderType;
-  onOpenDataset: () => void;
-  onCloseFile: () => void;
+    fileInfo: FileInfo | null;
+    aiProvider: AIProviderType;
+    onOpenDataset: () => void;
+    onCloseFile: () => void;
 }
 
 /**
@@ -161,23 +166,23 @@ interface HomeSidebarContentProps {
  * - Status section with AI provider info
  */
 const HomeSidebarContent = ({
-  fileInfo,
-  aiProvider,
-  onOpenDataset,
-  onCloseFile,
+    fileInfo,
+    aiProvider,
+    onOpenDataset,
+    onCloseFile,
 }: HomeSidebarContentProps) => {
-  return (
-    <div className="flex flex-col p-3 gap-3">
-      {/* Start section */}
-      <StartSection onOpenDataset={onOpenDataset} />
+    return (
+        <div className="flex flex-col gap-3 p-3">
+            {/* Start section */}
+            <StartSection onOpenDataset={onOpenDataset} />
 
-      {/* Current file section - always shown */}
-      <CurrentFileSection fileInfo={fileInfo} onClose={onCloseFile} />
+            {/* Current file section - always shown */}
+            <CurrentFileSection fileInfo={fileInfo} onClose={onCloseFile} />
 
-      {/* Status section */}
-      <StatusSection aiProvider={aiProvider} />
-    </div>
-  );
+            {/* Status section */}
+            <StatusSection aiProvider={aiProvider} />
+        </div>
+    );
 };
 
 export default HomeSidebarContent;

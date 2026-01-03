@@ -27,71 +27,71 @@ import { Logo, HomeSidebarContent, HomeMainContent } from "@/components/home";
  * - File loaded: Same layout, sidebar shows current file info
  */
 export default function HomePage() {
-  const { fileInfo, isFileLoaded } = useFileState();
-  const { aiProviderType } = useSettings();
+    const { fileInfo, isFileLoaded } = useFileState();
+    const { aiProviderType } = useSettings();
 
-  // ==========================================================================
-  // HANDLERS
-  // ==========================================================================
+    // ==========================================================================
+    // HANDLERS
+    // ==========================================================================
 
-  /**
-   * Opens the native file dialog and loads the selected file.
-   */
-  const handleOpenDataset = useCallback(async () => {
-    try {
-      const filePath = await invoke<string | null>("open_file_dialog");
-      if (!filePath) return;
+    /**
+     * Opens the native file dialog and loads the selected file.
+     */
+    const handleOpenDataset = useCallback(async () => {
+        try {
+            const filePath = await invoke<string | null>("open_file_dialog");
+            if (!filePath) return;
 
-      // Close existing file if one is loaded
-      if (fileInfo) {
-        await invoke("close_file");
-      }
+            // Close existing file if one is loaded
+            if (fileInfo) {
+                await invoke("close_file");
+            }
 
-      await invoke<FileInfo>("load_file", { path: filePath });
-      toast.success("Dataset loaded successfully");
-    } catch (err) {
-      toast.error(`Failed to load dataset: ${err}`);
-    }
-  }, [fileInfo]);
+            await invoke<FileInfo>("load_file", { path: filePath });
+            toast.success("Dataset loaded successfully");
+        } catch (err) {
+            toast.error(`Failed to load dataset: ${err}`);
+        }
+    }, [fileInfo]);
 
-  /**
-   * Closes the currently loaded file.
-   */
-  const handleCloseFile = useCallback(async () => {
-    try {
-      await invoke("close_file");
-      toast.success("Dataset closed");
-    } catch (err) {
-      toast.error(`Failed to close dataset: ${err}`);
-    }
-  }, []);
+    /**
+     * Closes the currently loaded file.
+     */
+    const handleCloseFile = useCallback(async () => {
+        try {
+            await invoke("close_file");
+            toast.success("Dataset closed");
+        } catch (err) {
+            toast.error(`Failed to close dataset: ${err}`);
+        }
+    }, []);
 
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
 
-  return (
-    <AppShell
-      toolbar={null}
-      sidebar={
-        <ContextSidebar>
-          <HomeSidebarContent
-            fileInfo={isFileLoaded ? fileInfo : null}
-            aiProvider={aiProviderType}
-            onOpenDataset={handleOpenDataset}
-            onCloseFile={handleCloseFile}
-          />
-        </ContextSidebar>
-      }
-    >
-      {/* Main content area - centered logo with links below */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
-        {/* Logo */}
-        <Logo className="mb-12" />
+    return (
+        <AppShell
+            toolbar={null}
+            sidebar={
+                <ContextSidebar>
+                    <HomeSidebarContent
+                        fileInfo={isFileLoaded ? fileInfo : null}
+                        aiProvider={aiProviderType}
+                        onOpenDataset={handleOpenDataset}
+                        onCloseFile={handleCloseFile}
+                    />
+                </ContextSidebar>
+            }
+        >
+            {/* Main content area - centered logo with links below */}
+            <div className="flex flex-1 flex-col items-center justify-center p-8">
+                {/* Logo */}
+                <Logo className="mb-12" />
 
-        {/* Workflow and Links */}
-        <HomeMainContent />
-      </div>
-    </AppShell>
-  );
+                {/* Workflow and Links */}
+                <HomeMainContent />
+            </div>
+        </AppShell>
+    );
 }

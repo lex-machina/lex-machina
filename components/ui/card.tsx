@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
 // ============================================================================
 
 interface CardHeaderProps {
-  /** The title text displayed in the header */
-  title: string;
-  /** Optional actions to display on the right side of the header */
-  actions?: ReactNode;
-  /** Additional class names */
-  className?: string;
+    /** The title text displayed in the header */
+    title: string;
+    /** Optional actions to display on the right side of the header */
+    actions?: ReactNode;
+    /** Additional class names */
+    className?: string;
 }
 
 /**
@@ -26,19 +26,21 @@ interface CardHeaderProps {
  * ```
  */
 const CardHeader = ({ title, actions, className }: CardHeaderProps) => {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between px-3 py-2 border-b bg-muted/30 shrink-0",
-        className
-      )}
-    >
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
-  );
+    return (
+        <div
+            className={cn(
+                "bg-muted/30 flex shrink-0 items-center justify-between border-b px-3 py-2",
+                className,
+            )}
+        >
+            <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                {title}
+            </h3>
+            {actions && (
+                <div className="flex items-center gap-2">{actions}</div>
+            )}
+        </div>
+    );
 };
 
 // ============================================================================
@@ -46,14 +48,14 @@ const CardHeader = ({ title, actions, className }: CardHeaderProps) => {
 // ============================================================================
 
 interface CardContentProps {
-  /** Content to render inside the card body */
-  children: ReactNode;
-  /** Whether the content should scroll when it overflows */
-  scrollable?: boolean;
-  /** Whether to add default padding */
-  padded?: boolean;
-  /** Additional class names */
-  className?: string;
+    /** Content to render inside the card body */
+    children: ReactNode;
+    /** Whether the content should scroll when it overflows */
+    scrollable?: boolean;
+    /** Whether to add default padding */
+    padded?: boolean;
+    /** Additional class names */
+    className?: string;
 }
 
 /**
@@ -67,23 +69,23 @@ interface CardContentProps {
  * ```
  */
 const CardContent = ({
-  children,
-  scrollable = false,
-  padded = false,
-  className,
+    children,
+    scrollable = false,
+    padded = false,
+    className,
 }: CardContentProps) => {
-  return (
-    <div
-      className={cn(
-        "flex-1 min-h-0",
-        scrollable && "overflow-y-auto",
-        padded && "p-3",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+    return (
+        <div
+            className={cn(
+                "min-h-0 flex-1",
+                scrollable && "overflow-y-auto",
+                padded && "p-3",
+                className,
+            )}
+        >
+            {children}
+        </div>
+    );
 };
 
 // ============================================================================
@@ -91,10 +93,10 @@ const CardContent = ({
 // ============================================================================
 
 interface CardFooterProps {
-  /** Content to render in the footer */
-  children: ReactNode;
-  /** Additional class names */
-  className?: string;
+    /** Content to render in the footer */
+    children: ReactNode;
+    /** Additional class names */
+    className?: string;
 }
 
 /**
@@ -108,16 +110,13 @@ interface CardFooterProps {
  * ```
  */
 const CardFooter = ({ children, className }: CardFooterProps) => {
-  return (
-    <div
-      className={cn(
-        "px-3 py-2 border-t bg-muted/30 shrink-0",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+    return (
+        <div
+            className={cn("bg-muted/30 shrink-0 border-t px-3 py-2", className)}
+        >
+            {children}
+        </div>
+    );
 };
 
 // ============================================================================
@@ -125,10 +124,10 @@ const CardFooter = ({ children, className }: CardFooterProps) => {
 // ============================================================================
 
 interface CardProps {
-  /** Content to render inside the card */
-  children: ReactNode;
-  /** Additional class names */
-  className?: string;
+    /** Content to render inside the card */
+    children: ReactNode;
+    /** Additional class names */
+    className?: string;
 }
 
 /**
@@ -158,16 +157,16 @@ interface CardProps {
  * ```
  */
 const Card = ({ children, className }: CardProps) => {
-  return (
-    <div
-      className={cn(
-        "border rounded-lg overflow-hidden flex flex-col bg-background",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+    return (
+        <div
+            className={cn(
+                "bg-background flex flex-col overflow-hidden rounded-lg border",
+                className,
+            )}
+        >
+            {children}
+        </div>
+    );
 };
 
 export { Card, CardHeader, CardContent, CardFooter };

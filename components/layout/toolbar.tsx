@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 
 interface ToolbarProps {
-  /** Content to render on the left side of the toolbar */
-  children?: ReactNode;
+    /** Content to render on the left side of the toolbar */
+    children?: ReactNode;
 }
 
 /**
@@ -25,12 +25,14 @@ interface ToolbarProps {
  * ```
  */
 const Toolbar = ({ children }: ToolbarProps) => {
-  return (
-    <header className="flex items-center justify-between h-12 px-5 border-b bg-background">
-      <div className="flex items-center gap-2">{children}</div>
-      <h1 className="text-lg font-bold text-muted-foreground">Lex Machina</h1>
-    </header>
-  );
+    return (
+        <header className="bg-background flex h-12 items-center justify-between border-b px-5">
+            <div className="flex items-center gap-2">{children}</div>
+            <h1 className="text-muted-foreground text-lg font-bold">
+                Lex Machina
+            </h1>
+        </header>
+    );
 };
 
 export default Toolbar;

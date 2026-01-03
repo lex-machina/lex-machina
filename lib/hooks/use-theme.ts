@@ -19,30 +19,30 @@ export type ResolvedTheme = "light" | "dark";
  * State returned by the useTheme hook.
  */
 export interface ThemeState {
-  /** The current theme setting (may be "system") */
-  theme: Theme;
-  /** The actual theme being applied ("light" or "dark") */
-  resolvedTheme: ResolvedTheme;
-  /** Whether the system prefers dark mode */
-  systemPrefersDark: boolean;
+    /** The current theme setting (may be "system") */
+    theme: Theme;
+    /** The actual theme being applied ("light" or "dark") */
+    resolvedTheme: ResolvedTheme;
+    /** Whether the system prefers dark mode */
+    systemPrefersDark: boolean;
 }
 
 /**
  * Actions returned by the useTheme hook.
  */
 export interface ThemeActions {
-  /**
-   * Sets the application theme.
-   *
-   * @param theme - The theme to apply ("system", "light", or "dark")
-   */
-  setTheme: (theme: Theme) => Promise<void>;
+    /**
+     * Sets the application theme.
+     *
+     * @param theme - The theme to apply ("system", "light", or "dark")
+     */
+    setTheme: (theme: Theme) => Promise<void>;
 
-  /**
-   * Toggles between light and dark themes.
-   * If current theme is "system", it will switch to the opposite of the current resolved theme.
-   */
-  toggleTheme: () => Promise<void>;
+    /**
+     * Toggles between light and dark themes.
+     * If current theme is "system", it will switch to the opposite of the current resolved theme.
+     */
+    toggleTheme: () => Promise<void>;
 }
 
 /**
@@ -58,20 +58,20 @@ export type UseThemeReturn = ThemeState & ThemeActions;
  * Gets the system's preferred color scheme.
  */
 function getSystemPreference(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (typeof window === "undefined") {
+        return false;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 /**
  * Resolves the actual theme to apply based on the setting and system preference.
  */
 function resolveTheme(theme: Theme, systemPrefersDark: boolean): ResolvedTheme {
-  if (theme === "system") {
-    return systemPrefersDark ? "dark" : "light";
-  }
-  return theme;
+    if (theme === "system") {
+        return systemPrefersDark ? "dark" : "light";
+    }
+    return theme;
 }
 
 /**
@@ -79,20 +79,20 @@ function resolveTheme(theme: Theme, systemPrefersDark: boolean): ResolvedTheme {
  * This adds/removes the "dark" class on <html>.
  */
 function applyThemeToDOM(resolvedTheme: ResolvedTheme): void {
-  if (typeof document === "undefined") {
-    return;
-  }
+    if (typeof document === "undefined") {
+        return;
+    }
 
-  const root = document.documentElement;
+    const root = document.documentElement;
 
-  if (resolvedTheme === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+    if (resolvedTheme === "dark") {
+        root.classList.add("dark");
+    } else {
+        root.classList.remove("dark");
+    }
 
-  // Also set the color-scheme CSS property for native elements
-  root.style.colorScheme = resolvedTheme;
+    // Also set the color-scheme CSS property for native elements
+    root.style.colorScheme = resolvedTheme;
 }
 
 // ============================================================================
@@ -153,126 +153,126 @@ function applyThemeToDOM(resolvedTheme: ResolvedTheme): void {
  * which works with Tailwind's dark mode class strategy.
  */
 export function useTheme(): UseThemeReturn {
-  // State
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
-
-  // Derived state
-  const resolvedTheme = resolveTheme(theme, systemPrefersDark);
-
-  // ============================================================================
-  // SYSTEM PREFERENCE MONITORING
-  // ============================================================================
-
-  /**
-   * Initialize system preference and set up listener.
-   */
-  useEffect(() => {
-    // Get initial system preference
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Initial state sync on mount
-    setSystemPrefersDark(getSystemPreference());
-
-    // Listen for system preference changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setSystemPrefersDark(e.matches);
-    };
-
-    // Modern browsers
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
-  // ============================================================================
-  // THEME APPLICATION
-  // ============================================================================
-
-  /**
-   * Apply theme to DOM whenever resolved theme changes.
-   */
-  useEffect(() => {
-    applyThemeToDOM(resolvedTheme);
-  }, [resolvedTheme]);
-
-  // ============================================================================
-  // RUST SYNCHRONIZATION
-  // ============================================================================
-
-  /**
-   * Fetch theme from Rust on mount.
-   */
-  useEffect(() => {
-    const fetchTheme = async () => {
-      try {
-        const rustTheme = await invoke<Theme>("get_theme");
-        setThemeState(rustTheme);
-      } catch (err) {
-        console.error("Failed to fetch theme from Rust:", err);
-        // Fall back to system theme
-        setThemeState("system");
-      }
-    };
-
-    fetchTheme();
-  }, []);
-
-  /**
-   * Handle theme changed event from Rust.
-   */
-  const handleThemeChanged = useCallback((newTheme: ThemeChangedPayload) => {
-    setThemeState(newTheme);
-  }, []);
-
-  useRustEvent<ThemeChangedPayload>(
-    RUST_EVENTS.THEME_CHANGED,
-    handleThemeChanged
-  );
-
-  // ============================================================================
-  // ACTIONS
-  // ============================================================================
-
-  /**
-   * Sets the application theme.
-   */
-  const setTheme = useCallback(async (newTheme: Theme) => {
-    try {
-      await invoke("set_theme", { theme: newTheme });
-      // Local state will be updated via the event handler
-    } catch (err) {
-      console.error("Failed to set theme:", err);
-      // Optimistically update local state anyway
-      setThemeState(newTheme);
-    }
-  }, []);
-
-  /**
-   * Toggles between light and dark themes.
-   */
-  const toggleTheme = useCallback(async () => {
-    // Toggle to the opposite of the current resolved theme
-    const newTheme: Theme = resolvedTheme === "dark" ? "light" : "dark";
-    await setTheme(newTheme);
-  }, [resolvedTheme, setTheme]);
-
-  // ============================================================================
-  // RETURN
-  // ============================================================================
-
-  return {
     // State
-    theme,
-    resolvedTheme,
-    systemPrefersDark,
+    const [theme, setThemeState] = useState<Theme>("system");
+    const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
-    // Actions
-    setTheme,
-    toggleTheme,
-  };
+    // Derived state
+    const resolvedTheme = resolveTheme(theme, systemPrefersDark);
+
+    // ============================================================================
+    // SYSTEM PREFERENCE MONITORING
+    // ============================================================================
+
+    /**
+     * Initialize system preference and set up listener.
+     */
+    useEffect(() => {
+        // Get initial system preference
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Initial state sync on mount
+        setSystemPrefersDark(getSystemPreference());
+
+        // Listen for system preference changes
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+        const handleChange = (e: MediaQueryListEvent) => {
+            setSystemPrefersDark(e.matches);
+        };
+
+        // Modern browsers
+        mediaQuery.addEventListener("change", handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener("change", handleChange);
+        };
+    }, []);
+
+    // ============================================================================
+    // THEME APPLICATION
+    // ============================================================================
+
+    /**
+     * Apply theme to DOM whenever resolved theme changes.
+     */
+    useEffect(() => {
+        applyThemeToDOM(resolvedTheme);
+    }, [resolvedTheme]);
+
+    // ============================================================================
+    // RUST SYNCHRONIZATION
+    // ============================================================================
+
+    /**
+     * Fetch theme from Rust on mount.
+     */
+    useEffect(() => {
+        const fetchTheme = async () => {
+            try {
+                const rustTheme = await invoke<Theme>("get_theme");
+                setThemeState(rustTheme);
+            } catch (err) {
+                console.error("Failed to fetch theme from Rust:", err);
+                // Fall back to system theme
+                setThemeState("system");
+            }
+        };
+
+        fetchTheme();
+    }, []);
+
+    /**
+     * Handle theme changed event from Rust.
+     */
+    const handleThemeChanged = useCallback((newTheme: ThemeChangedPayload) => {
+        setThemeState(newTheme);
+    }, []);
+
+    useRustEvent<ThemeChangedPayload>(
+        RUST_EVENTS.THEME_CHANGED,
+        handleThemeChanged,
+    );
+
+    // ============================================================================
+    // ACTIONS
+    // ============================================================================
+
+    /**
+     * Sets the application theme.
+     */
+    const setTheme = useCallback(async (newTheme: Theme) => {
+        try {
+            await invoke("set_theme", { theme: newTheme });
+            // Local state will be updated via the event handler
+        } catch (err) {
+            console.error("Failed to set theme:", err);
+            // Optimistically update local state anyway
+            setThemeState(newTheme);
+        }
+    }, []);
+
+    /**
+     * Toggles between light and dark themes.
+     */
+    const toggleTheme = useCallback(async () => {
+        // Toggle to the opposite of the current resolved theme
+        const newTheme: Theme = resolvedTheme === "dark" ? "light" : "dark";
+        await setTheme(newTheme);
+    }, [resolvedTheme, setTheme]);
+
+    // ============================================================================
+    // RETURN
+    // ============================================================================
+
+    return {
+        // State
+        theme,
+        resolvedTheme,
+        systemPrefersDark,
+
+        // Actions
+        setTheme,
+        toggleTheme,
+    };
 }
 
 /**
@@ -304,7 +304,7 @@ export function useTheme(): UseThemeReturn {
  * 2. Using CSS that handles both themes gracefully during the brief loading period
  */
 export function getThemeInitScript(): string {
-  return `
+    return `
     (function() {
       try {
         var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

@@ -35,110 +35,113 @@ const APP_VERSION = "v0.1.0";
  * Theme changes are applied immediately to the DOM.
  */
 export default function SettingsPage() {
-  // Hooks
-  const {
-    theme,
-    setTheme,
-    aiConfig,
-    savedProviders,
-    configureAIProvider,
-    clearAIProvider,
-    switchProvider,
-    deleteSavedProvider,
-    validateAPIKey,
-    validationStatus,
-    validationError,
-    isLoading,
-    refresh,
-  } = useSettings();
+    // Hooks
+    const {
+        theme,
+        setTheme,
+        aiConfig,
+        savedProviders,
+        configureAIProvider,
+        clearAIProvider,
+        switchProvider,
+        deleteSavedProvider,
+        validateAPIKey,
+        validationStatus,
+        validationError,
+        isLoading,
+        refresh,
+    } = useSettings();
 
-  // Use the theme hook to ensure theme is applied to DOM
-  useTheme();
+    // Use the theme hook to ensure theme is applied to DOM
+    useTheme();
 
-  // Refresh settings when page is visited
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+    // Refresh settings when page is visited
+    useEffect(() => {
+        refresh();
+    }, [refresh]);
 
-  return (
-    <AppShell
-      toolbar={
-        <div className="flex items-center gap-2">
-          <SettingsIcon className="w-4 h-4" />
-          <h1 className="text-sm font-medium">Settings</h1>
-        </div>
-      }
-    >
-      <div className="flex-1 flex flex-col p-4 min-h-0">
-        {/* Loading state */}
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Loading settings...</span>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Two Column Grid */}
-            <div className="flex-1 grid grid-cols-2 gap-6 min-h-0">
-              {/* Left Column - Appearance */}
-              <div className="flex flex-col min-h-0">
-                <div className="border rounded-lg flex flex-col h-full">
-                  <div className="px-4 py-3 border-b bg-muted/30">
-                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Appearance
-                    </h2>
-                  </div>
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    <div className="flex flex-col gap-2 mb-4">
-                      <h3 className="text-sm font-medium">Theme</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Choose how Lex Machina looks on your device
-                      </p>
+    return (
+        <AppShell
+            toolbar={
+                <div className="flex items-center gap-2">
+                    <SettingsIcon className="h-4 w-4" />
+                    <h1 className="text-sm font-medium">Settings</h1>
+                </div>
+            }
+        >
+            <div className="flex min-h-0 flex-1 flex-col p-4">
+                {/* Loading state */}
+                {isLoading ? (
+                    <div className="flex flex-1 items-center justify-center">
+                        <div className="text-muted-foreground flex items-center gap-3">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading settings...</span>
+                        </div>
                     </div>
-                    <ThemeSelector
-                      value={theme}
-                      onChange={setTheme}
-                    />
-                  </div>
-                </div>
-              </div>
+                ) : (
+                    <>
+                        {/* Two Column Grid */}
+                        <div className="grid min-h-0 flex-1 grid-cols-2 gap-6">
+                            {/* Left Column - Appearance */}
+                            <div className="flex min-h-0 flex-col">
+                                <div className="flex h-full flex-col rounded-lg border">
+                                    <div className="bg-muted/30 border-b px-4 py-3">
+                                        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                                            Appearance
+                                        </h2>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        <div className="mb-4 flex flex-col gap-2">
+                                            <h3 className="text-sm font-medium">
+                                                Theme
+                                            </h3>
+                                            <p className="text-muted-foreground text-xs">
+                                                Choose how Lex Machina looks on
+                                                your device
+                                            </p>
+                                        </div>
+                                        <ThemeSelector
+                                            value={theme}
+                                            onChange={setTheme}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-              {/* Right Column - AI Provider */}
-              <div className="flex flex-col min-h-0">
-                <div className="border rounded-lg flex flex-col h-full">
-                  <div className="px-4 py-3 border-b bg-muted/30">
-                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      AI Provider
-                    </h2>
-                  </div>
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    <AIProviderConfig
-                      config={aiConfig}
-                      savedProviders={savedProviders}
-                      onConfigure={configureAIProvider}
-                      onClear={clearAIProvider}
-                      onSwitch={switchProvider}
-                      onDelete={deleteSavedProvider}
-                      onValidate={validateAPIKey}
-                      validationStatus={validationStatus}
-                      validationError={validationError}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+                            {/* Right Column - AI Provider */}
+                            <div className="flex min-h-0 flex-col">
+                                <div className="flex h-full flex-col rounded-lg border">
+                                    <div className="bg-muted/30 border-b px-4 py-3">
+                                        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                                            AI Provider
+                                        </h2>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        <AIProviderConfig
+                                            config={aiConfig}
+                                            savedProviders={savedProviders}
+                                            onConfigure={configureAIProvider}
+                                            onClear={clearAIProvider}
+                                            onSwitch={switchProvider}
+                                            onDelete={deleteSavedProvider}
+                                            onValidate={validateAPIKey}
+                                            validationStatus={validationStatus}
+                                            validationError={validationError}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-            {/* Version Footer */}
-            <div className="mt-4 pt-3 border-t text-center">
-              <p className="text-xs text-muted-foreground">
-                Lex Machina {APP_VERSION}
-              </p>
+                        {/* Version Footer */}
+                        <div className="mt-4 border-t pt-3 text-center">
+                            <p className="text-muted-foreground text-xs">
+                                Lex Machina {APP_VERSION}
+                            </p>
+                        </div>
+                    </>
+                )}
             </div>
-          </>
-        )}
-      </div>
-    </AppShell>
-  );
+        </AppShell>
+    );
 }

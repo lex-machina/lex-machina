@@ -1,0 +1,20 @@
+# Build outputs
+.next/
+out/
+build/
+target/
+
+# Rust crates
+src-tauri/
+crates/
+
+# Dependencies
+node_modules/
+
+# Generated files
+*.lock
+pnpm-lock.yaml
+package-lock.json
+
+# Type definitions
+next-env.d.ts

@@ -8,12 +8,12 @@ import StatusBar from "@/components/layout/status-bar";
 import ToastContainer from "@/components/ui/toast";
 
 interface AppShellProps {
-  /** Content for the toolbar (left side buttons) */
-  toolbar?: ReactNode;
-  /** Content for the right context sidebar */
-  sidebar?: ReactNode;
-  /** Main content area */
-  children: ReactNode;
+    /** Content for the toolbar (left side buttons) */
+    toolbar?: ReactNode;
+    /** Content for the right context sidebar */
+    sidebar?: ReactNode;
+    /** Main content area */
+    children: ReactNode;
 }
 
 /**
@@ -61,30 +61,30 @@ interface AppShellProps {
  * ```
  */
 const AppShell = ({ toolbar, sidebar, children }: AppShellProps) => {
-  return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-      {/* Top toolbar with page-specific content */}
-      <Toolbar>{toolbar}</Toolbar>
+    return (
+        <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
+            {/* Top toolbar with page-specific content */}
+            <Toolbar>{toolbar}</Toolbar>
 
-      {/* Main area: NavSidebar + Content + ContextSidebar */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left navigation - always visible */}
-        <NavSidebar />
+            {/* Main area: NavSidebar + Content + ContextSidebar */}
+            <div className="flex flex-1 overflow-hidden">
+                {/* Left navigation - always visible */}
+                <NavSidebar />
 
-        {/* Main content area */}
-        <main className="flex flex-1 overflow-hidden">{children}</main>
+                {/* Main content area */}
+                <main className="flex flex-1 overflow-hidden">{children}</main>
 
-        {/* Right context sidebar - page-specific */}
-        {sidebar}
-      </div>
+                {/* Right context sidebar - page-specific */}
+                {sidebar}
+            </div>
 
-      {/* Bottom status bar - subscribes to events internally */}
-      <StatusBar />
+            {/* Bottom status bar - subscribes to events internally */}
+            <StatusBar />
 
-      {/* Toast notifications */}
-      <ToastContainer />
-    </div>
-  );
+            {/* Toast notifications */}
+            <ToastContainer />
+        </div>
+    );
 };
 
 export default AppShell;
