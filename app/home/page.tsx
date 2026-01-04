@@ -7,7 +7,6 @@ import type { FileInfo } from "@/types";
 import { useFileState } from "@/lib/hooks/use-file-state";
 import { useSettings } from "@/lib/hooks/use-settings";
 import AppShell from "@/components/layout/app-shell";
-import ContextSidebar from "@/components/layout/context-sidebar";
 import { toast } from "@/components/ui/toast";
 import { Logo, HomeSidebarContent, HomeMainContent } from "@/components/home";
 
@@ -20,7 +19,7 @@ import { Logo, HomeSidebarContent, HomeMainContent } from "@/components/home";
  *
  * Layout:
  * - Main area: Logo centered with workflow/links below
- * - Right sidebar: Start actions, current file info, status (using ContextSidebar)
+ * - Right sidebar: Start actions, current file info, status
  *
  * The page adapts based on whether a file is loaded:
  * - No file: Shows logo + links, sidebar shows "Open Dataset"
@@ -72,16 +71,13 @@ export default function HomePage() {
 
     return (
         <AppShell
-            toolbar={null}
             sidebar={
-                <ContextSidebar>
-                    <HomeSidebarContent
-                        fileInfo={isFileLoaded ? fileInfo : null}
-                        aiProvider={aiProviderType}
-                        onOpenDataset={handleOpenDataset}
-                        onCloseFile={handleCloseFile}
-                    />
-                </ContextSidebar>
+                <HomeSidebarContent
+                    fileInfo={isFileLoaded ? fileInfo : null}
+                    aiProvider={aiProviderType}
+                    onOpenDataset={handleOpenDataset}
+                    onCloseFile={handleCloseFile}
+                />
             }
         >
             {/* Main content area - centered logo with links below */}

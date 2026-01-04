@@ -10,6 +10,7 @@ export type {
 // Page layout components
 export { EmptyState } from "./empty-state";
 export { ProcessingToolbar } from "./toolbar";
+export { ProcessingSidebar } from "./sidebar";
 export { ColumnsPanel } from "./columns-panel";
 export { ConfigPanelWrapper } from "./config-panel-wrapper";
 export { ResultsPanelWrapper } from "./results-panel-wrapper";

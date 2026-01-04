@@ -135,6 +135,7 @@ export interface GridScrollPosition {
  */
 export interface UIState {
     sidebar_width: number;
+    sidebar_collapsed: boolean;
     column_widths: number[];
     grid_scroll: GridScrollPosition;
 }
@@ -163,6 +164,12 @@ export interface AIProviderConfig {
  * Mirrors: state.rs::Theme
  */
 export type Theme = "system" | "light" | "dark";
+
+/**
+ * Navigation bar position setting.
+ * Mirrors: state.rs::NavBarPosition
+ */
+export type NavBarPosition = "left" | "right" | "merged";
 
 // ============================================================================
 // PREPROCESSING CONFIGURATION TYPES

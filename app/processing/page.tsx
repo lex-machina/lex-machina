@@ -5,7 +5,7 @@ import { useProcessingUIState } from "@/lib/hooks/use-processing-ui-state";
 import AppShell from "@/components/layout/app-shell";
 import {
     ProcessingProvider,
-    ProcessingToolbar,
+    ProcessingSidebar,
     ProcessingLayout,
 } from "@/components/processing";
 
@@ -32,6 +32,7 @@ import {
  * - useProcessingUIState: Handles UI state persistence to Rust
  * - ProcessingProvider: Combines file state, preprocessing ops, and settings
  * - ProcessingLayout: Three-column layout with extracted panel components
+ * - ProcessingSidebar: Start button + selection summary (in right sidebar)
  */
 export default function ProcessingPage() {
     // File state for UI state persistence
@@ -60,7 +61,7 @@ export default function ProcessingPage() {
             activeResultsTab={activeResultsTab}
             setActiveResultsTab={setActiveResultsTab}
         >
-            <AppShell toolbar={<ProcessingToolbar />}>
+            <AppShell sidebar={<ProcessingSidebar />}>
                 <ProcessingLayout />
             </AppShell>
         </ProcessingProvider>

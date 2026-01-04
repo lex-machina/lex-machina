@@ -10,7 +10,6 @@ import { useProcessedData } from "@/lib/hooks/use-processed-data";
 import { useAppStatus } from "@/lib/hooks/use-app-status";
 import AppShell from "@/components/layout/app-shell";
 import { DataGrid, ProcessedDataGrid } from "@/components/data-grid";
-import ContextSidebar from "@/components/layout/context-sidebar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
@@ -23,23 +22,24 @@ import { formatBytes, formatNumber } from "@/lib/utils";
 type DataTab = "original" | "processed";
 
 // ============================================================================
-// DATA TOOLBAR
+// SIDEBAR COMPONENTS
 // ============================================================================
 
-interface DataToolbarProps {
+/**
+ * Sidebar Actions - Import/Clear buttons and tab navigation.
+ * These were previously in the toolbar, now in sidebar.
+ */
+interface SidebarActionsProps {
     activeTab: DataTab;
     onTabChange: (tab: DataTab) => void;
     hasProcessedData: boolean;
 }
 
-/**
- * Data Toolbar - Import/Clear buttons and tab navigation.
- */
-function DataToolbar({
+function SidebarActions({
     activeTab,
     onTabChange,
     hasProcessedData,
-}: DataToolbarProps) {
+}: SidebarActionsProps) {
     const { fileInfo } = useFileState();
     const { isLoading, loadingMessage } = useAppStatus();
 
@@ -69,18 +69,17 @@ function DataToolbar({
     }, []);
 
     return (
-        <div className="flex w-full items-center gap-4">
-            {/* Left side: Import/Clear buttons */}
+        <div className="space-y-4 border-b p-4">
+            {/* Action buttons */}
             <div className="flex items-center gap-2">
                 <Button
                     variant="outline"
                     size="sm"
                     onClick={handleImport}
                     disabled={isLoading}
+                    className="flex-1"
                 >
-                    {isLoading && loadingMessage
-                        ? loadingMessage
-                        : "Import File"}
+                    {isLoading && loadingMessage ? loadingMessage : "Import"}
                 </Button>
                 {fileInfo && (
                     <Button
@@ -89,22 +88,26 @@ function DataToolbar({
                         onClick={handleClear}
                         disabled={isLoading}
                     >
-                        Clear File
+                        Clear
                     </Button>
                 )}
             </div>
 
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Right side: Tabs */}
+            {/* Tab navigation */}
             <Tabs
                 value={activeTab}
                 onValueChange={(v) => onTabChange(v as DataTab)}
+                className="w-full"
             >
-                <TabsList>
-                    <TabsTrigger value="original">Original</TabsTrigger>
-                    <TabsTrigger value="processed" disabled={!hasProcessedData}>
+                <TabsList className="w-full">
+                    <TabsTrigger value="original" className="flex-1">
+                        Original
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="processed"
+                        disabled={!hasProcessedData}
+                        className="flex-1"
+                    >
                         Processed
                     </TabsTrigger>
                 </TabsList>
@@ -112,10 +115,6 @@ function DataToolbar({
         </div>
     );
 }
-
-// ============================================================================
-// SIDEBAR COMPONENTS
-// ============================================================================
 
 /**
  * Original Data Sidebar - File info and column list for original data.
@@ -125,7 +124,7 @@ function OriginalDataSidebar() {
 
     if (!fileInfo) {
         return (
-            <div className="p-5">
+            <div className="p-4">
                 <p className="text-muted-foreground text-sm">
                     Import a file to view details
                 </p>
@@ -134,7 +133,7 @@ function OriginalDataSidebar() {
     }
 
     return (
-        <div className="space-y-5 p-5">
+        <div className="space-y-5 p-4">
             <section>
                 <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
                     File Info
@@ -235,7 +234,7 @@ function ProcessedDataSidebar() {
 
     if (!fileInfo) {
         return (
-            <div className="p-5">
+            <div className="p-4">
                 <p className="text-muted-foreground text-sm">
                     No processed data available
                 </p>
@@ -244,7 +243,7 @@ function ProcessedDataSidebar() {
     }
 
     return (
-        <div className="space-y-5 p-5">
+        <div className="space-y-5 p-4">
             {/* Preprocessing Summary */}
             {summary && (
                 <section>
@@ -372,6 +371,39 @@ function ProcessedDataSidebar() {
     );
 }
 
+/**
+ * Combined Data Sidebar - Actions + Tab-specific content.
+ */
+interface DataSidebarProps {
+    activeTab: DataTab;
+    onTabChange: (tab: DataTab) => void;
+    hasProcessedData: boolean;
+}
+
+function DataSidebar({
+    activeTab,
+    onTabChange,
+    hasProcessedData,
+}: DataSidebarProps) {
+    return (
+        <>
+            {/* Actions at top */}
+            <SidebarActions
+                activeTab={activeTab}
+                onTabChange={onTabChange}
+                hasProcessedData={hasProcessedData}
+            />
+
+            {/* Tab-specific content */}
+            {activeTab === "original" ? (
+                <OriginalDataSidebar />
+            ) : (
+                <ProcessedDataSidebar />
+            )}
+        </>
+    );
+}
+
 // ============================================================================
 // DATA PAGE
 // ============================================================================
@@ -414,21 +446,12 @@ function DataPageContent() {
 
     return (
         <AppShell
-            toolbar={
-                <DataToolbar
+            sidebar={
+                <DataSidebar
                     activeTab={activeTab}
                     onTabChange={handleTabChange}
                     hasProcessedData={hasProcessedData}
                 />
-            }
-            sidebar={
-                <ContextSidebar visible={true}>
-                    {activeTab === "original" ? (
-                        <OriginalDataSidebar />
-                    ) : (
-                        <ProcessedDataSidebar />
-                    )}
-                </ContextSidebar>
             }
         >
             {/* Tab Content */}
@@ -463,14 +486,7 @@ export default function DataPage() {
  */
 function DataPageFallback() {
     return (
-        <AppShell
-            toolbar={<div className="h-8" />}
-            sidebar={
-                <ContextSidebar visible={true}>
-                    <div className="p-5" />
-                </ContextSidebar>
-            }
-        >
+        <AppShell sidebar={<div className="p-4" />}>
             <div className="text-muted-foreground flex h-full items-center justify-center">
                 Loading...
             </div>

@@ -112,7 +112,10 @@ impl std::fmt::Debug for PipelineResult {
             .field("success", &self.success)
             .field(
                 "dataframe",
-                &self.dataframe.as_ref().map(|df| format!("DataFrame({} x {})", df.height(), df.width())),
+                &self
+                    .dataframe
+                    .as_ref()
+                    .map(|df| format!("DataFrame({} x {})", df.height(), df.width())),
             )
             .field("cleaned_data_path", &self.cleaned_data_path)
             .field("target_column", &self.target_column)

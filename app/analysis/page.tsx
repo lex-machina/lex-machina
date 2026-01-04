@@ -11,7 +11,6 @@ import {
 
 import { useFileState } from "@/lib/hooks/use-file-state";
 import AppShell from "@/components/layout/app-shell";
-import ContextSidebar from "@/components/layout/context-sidebar";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/utils";
 
@@ -69,17 +68,6 @@ function NoFileLoadedState() {
 }
 
 /**
- * Analysis Toolbar - Actions for the analysis page.
- */
-const AnalysisToolbar = () => {
-    return (
-        <span className="text-muted-foreground text-sm">
-            Statistical Analysis
-        </span>
-    );
-};
-
-/**
  * Analysis Sidebar - Analysis options and results summary.
  */
 const AnalysisSidebar = () => {
@@ -87,7 +75,7 @@ const AnalysisSidebar = () => {
 
     if (!fileInfo) {
         return (
-            <div className="p-5">
+            <div className="p-4">
                 <p className="text-muted-foreground text-sm">
                     Load a file to run analysis
                 </p>
@@ -96,7 +84,7 @@ const AnalysisSidebar = () => {
     }
 
     return (
-        <div className="space-y-5 p-5">
+        <div className="space-y-5 p-4">
             <section>
                 <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
                     Dataset
@@ -170,14 +158,7 @@ const AnalysisContent = () => {
  */
 const AnalysisPage = () => {
     return (
-        <AppShell
-            toolbar={<AnalysisToolbar />}
-            sidebar={
-                <ContextSidebar visible={true}>
-                    <AnalysisSidebar />
-                </ContextSidebar>
-            }
-        >
+        <AppShell sidebar={<AnalysisSidebar />}>
             <AnalysisContent />
         </AppShell>
     );

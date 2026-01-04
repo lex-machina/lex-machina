@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { useTheme } from "@/lib/hooks/use-theme";
+import { SidebarProvider } from "@/lib/contexts/sidebar-context";
 
 /**
  * Theme Provider Component
@@ -26,12 +27,17 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
  *
  * Theme is managed by Rust (AppState) and applied via useTheme hook.
  * The "dark" class is added/removed from <html> by the hook.
+ *
+ * Sidebar state is managed by Rust and cached via SidebarProvider.
+ * This ensures sidebar state (collapsed, width) persists across navigation.
  */
 const RootLayout = ({ children }: Readonly<{ children: React.ReactNode }>) => {
     return (
         <html lang="en" suppressHydrationWarning>
             <body>
-                <ThemeProvider>{children}</ThemeProvider>
+                <SidebarProvider>
+                    <ThemeProvider>{children}</ThemeProvider>
+                </SidebarProvider>
             </body>
         </html>
     );

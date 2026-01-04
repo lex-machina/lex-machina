@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { Settings as SettingsIcon, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useTheme } from "@/lib/hooks/use-theme";
+import { useSidebar } from "@/lib/contexts/sidebar-context";
 
 import AppShell from "@/components/layout/app-shell";
-import { ThemeSelector, AIProviderConfig } from "@/components/settings";
+import {
+    ThemeSelector,
+    AIProviderConfig,
+    NavPositionSelector,
+} from "@/components/settings";
 
 // ============================================================================
 // CONSTANTS
@@ -24,6 +29,7 @@ const APP_VERSION = "v0.1.0";
  *
  * Features:
  * - Theme selection (System, Light, Dark)
+ * - Navigation position selection (Merged, Left, Right)
  * - AI provider configuration (OpenRouter, Gemini)
  * - API key management with validation
  *
@@ -31,8 +37,7 @@ const APP_VERSION = "v0.1.0";
  * - Two-column desktop layout (Appearance | AI Provider)
  * - Minimal version text at bottom
  *
- * Settings are stored in memory (session-only).
- * Theme changes are applied immediately to the DOM.
+ * This page opts out of sidebar content - shows vertical nav only.
  */
 export default function SettingsPage() {
     // Hooks
@@ -52,6 +57,8 @@ export default function SettingsPage() {
         refresh,
     } = useSettings();
 
+    const { navBarPosition, requestSetNavBarPosition } = useSidebar();
+
     // Use the theme hook to ensure theme is applied to DOM
     useTheme();
 
@@ -61,14 +68,7 @@ export default function SettingsPage() {
     }, [refresh]);
 
     return (
-        <AppShell
-            toolbar={
-                <div className="flex items-center gap-2">
-                    <SettingsIcon className="h-4 w-4" />
-                    <h1 className="text-sm font-medium">Settings</h1>
-                </div>
-            }
-        >
+        <AppShell sidebar={false}>
             <div className="flex min-h-0 flex-1 flex-col p-4">
                 {/* Loading state */}
                 {isLoading ? (
@@ -91,19 +91,41 @@ export default function SettingsPage() {
                                         </h2>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-4">
-                                        <div className="mb-4 flex flex-col gap-2">
-                                            <h3 className="text-sm font-medium">
-                                                Theme
-                                            </h3>
-                                            <p className="text-muted-foreground text-xs">
-                                                Choose how Lex Machina looks on
-                                                your device
-                                            </p>
+                                        {/* Theme Section */}
+                                        <div className="mb-6">
+                                            <div className="mb-4 flex flex-col gap-2">
+                                                <h3 className="text-sm font-medium">
+                                                    Theme
+                                                </h3>
+                                                <p className="text-muted-foreground text-xs">
+                                                    Choose how Lex Machina looks
+                                                    on your device
+                                                </p>
+                                            </div>
+                                            <ThemeSelector
+                                                value={theme}
+                                                onChange={setTheme}
+                                            />
                                         </div>
-                                        <ThemeSelector
-                                            value={theme}
-                                            onChange={setTheme}
-                                        />
+
+                                        {/* Layout Section */}
+                                        <div>
+                                            <div className="mb-4 flex flex-col gap-2">
+                                                <h3 className="text-sm font-medium">
+                                                    Navigation Position
+                                                </h3>
+                                                <p className="text-muted-foreground text-xs">
+                                                    Choose where the navigation
+                                                    bar appears
+                                                </p>
+                                            </div>
+                                            <NavPositionSelector
+                                                value={navBarPosition}
+                                                onChange={
+                                                    requestSetNavBarPosition
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

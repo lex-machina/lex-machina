@@ -175,6 +175,7 @@ pub struct GridScrollPosition {
 /// # Fields
 ///
 /// * `sidebar_width` - Width of the right sidebar in pixels
+/// * `sidebar_collapsed` - Whether the sidebar is collapsed (vertical nav only)
 /// * `column_widths` - Vector of column widths in pixels (one per column)
 /// * `grid_scroll` - Current scroll position of the data grid
 ///
@@ -184,6 +185,7 @@ pub struct GridScrollPosition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UIState {
     pub sidebar_width: f32,
+    pub sidebar_collapsed: bool,
     pub column_widths: Vec<f32>,
     pub grid_scroll: GridScrollPosition,
 }
@@ -192,11 +194,13 @@ impl Default for UIState {
     /// Creates a default UI state with reasonable initial values.
     ///
     /// - Sidebar width: 280px
+    /// - Sidebar collapsed: false (expanded by default)
     /// - Column widths: empty (populated when a file loads)
     /// - Grid scroll: top-left (0, 0)
     fn default() -> Self {
         Self {
             sidebar_width: 280.0,
+            sidebar_collapsed: false,
             column_widths: Vec::new(),
             grid_scroll: GridScrollPosition::default(),
         }
@@ -262,6 +266,26 @@ pub enum Theme {
     Light,
     /// Always use dark theme
     Dark,
+}
+
+/// Navigation bar position setting.
+///
+/// Controls where the navigation bar is positioned in the UI.
+/// Defaults to Merged, which combines nav with the right sidebar.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::NavBarPosition`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NavBarPosition {
+    /// Navigation bar on the left side (vertical, always visible)
+    Left,
+    /// Navigation bar on the right side (vertical, always visible)
+    Right,
+    /// Navigation merged with right sidebar (horizontal when expanded, vertical when collapsed)
+    #[default]
+    Merged,
 }
 
 // ============================================================================
@@ -463,6 +487,7 @@ impl Default for PreprocessingUIConfig {
 /// * `processed_dataframe` - The most recent preprocessed DataFrame
 /// * `last_preprocessing_result` - Summary from the most recent preprocessing run
 /// * `theme` - Application theme setting
+/// * `nav_bar_position` - Navigation bar position setting
 pub struct AppState {
     /// Currently loaded `DataFrame` with metadata.
     /// `None` when no file is loaded, `Some(LoadedDataFrame)` after loading
@@ -499,6 +524,10 @@ pub struct AppState {
     /// Defaults to System (follows OS preference).
     pub theme: RwLock<Theme>,
 
+    /// Navigation bar position setting (Left, Right, or Merged).
+    /// Defaults to Merged (combined with right sidebar).
+    pub nav_bar_position: RwLock<NavBarPosition>,
+
     /// UI state for the preprocessing page.
     /// Persists selected columns, row range, and config across navigation.
     /// Session-only: not persisted to disk.
@@ -517,6 +546,7 @@ impl AppState {
             processed_dataframe: RwLock::new(None),
             last_preprocessing_result: RwLock::new(None),
             theme: RwLock::new(Theme::default()),
+            nav_bar_position: RwLock::new(NavBarPosition::default()),
             preprocessing_ui_state: RwLock::new(PreprocessingUIState::default()),
         }
     }

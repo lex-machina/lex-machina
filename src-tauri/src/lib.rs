@@ -125,6 +125,11 @@ pub fn run() {
             commands::get_grid_scroll,
             // Updates scroll position (debounced from frontend)
             commands::set_grid_scroll,
+            // Sidebar collapsed state
+            // Toggles sidebar collapsed state and returns new state
+            commands::toggle_sidebar,
+            // Explicitly sets sidebar collapsed state
+            commands::set_sidebar_collapsed,
             // Preprocessing commands
             // Starts the preprocessing pipeline on the loaded DataFrame
             commands::start_preprocessing,
@@ -167,6 +172,11 @@ pub fn run() {
             commands::switch_ai_provider,
             // Deletes a saved provider's API key
             commands::delete_saved_provider,
+            // Navigation bar position commands
+            // Gets the current navigation bar position
+            commands::get_nav_bar_position,
+            // Sets the navigation bar position
+            commands::set_nav_bar_position,
             // Keyring commands (secure credential storage)
             // Stores an API key in the OS keychain
             commands::set_api_key,

@@ -378,20 +378,14 @@ pub async fn start_preprocessing(
     let result = tauri::async_runtime::spawn_blocking(move || {
         // Create AI provider if configured and AI decisions are enabled
         let ai_provider: Option<Arc<dyn AIProvider>> = if config.use_ai_decisions {
-            ai_provider_config.and_then(|cfg| {
-                match cfg.provider {
-                    AIProviderType::OpenRouter => {
-                        OpenRouterProvider::new(&cfg.api_key)
-                            .ok()
-                            .map(|p| Arc::new(p) as Arc<dyn AIProvider>)
-                    }
-                    AIProviderType::Gemini => {
-                        GeminiProvider::new(&cfg.api_key)
-                            .ok()
-                            .map(|p| Arc::new(p) as Arc<dyn AIProvider>)
-                    }
-                    AIProviderType::None => None,
-                }
+            ai_provider_config.and_then(|cfg| match cfg.provider {
+                AIProviderType::OpenRouter => OpenRouterProvider::new(&cfg.api_key)
+                    .ok()
+                    .map(|p| Arc::new(p) as Arc<dyn AIProvider>),
+                AIProviderType::Gemini => GeminiProvider::new(&cfg.api_key)
+                    .ok()
+                    .map(|p| Arc::new(p) as Arc<dyn AIProvider>),
+                AIProviderType::None => None,
             })
         } else {
             None

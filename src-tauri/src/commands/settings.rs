@@ -22,7 +22,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 
 use crate::events::AppEventEmitter;
-use crate::state::{AIProviderConfig, AIProviderType, AppState, Theme};
+use crate::state::{AIProviderConfig, AIProviderType, AppState, NavBarPosition, Theme};
 
 /// The settings store filename.
 const SETTINGS_STORE: &str = "settings.json";
@@ -31,7 +31,9 @@ const SETTINGS_STORE: &str = "settings.json";
 mod store_keys {
     pub const THEME: &str = "theme";
     pub const SIDEBAR_WIDTH: &str = "sidebar_width";
+    pub const SIDEBAR_COLLAPSED: &str = "sidebar_collapsed";
     pub const AI_PROVIDER_TYPE: &str = "ai_provider_type";
+    pub const NAV_BAR_POSITION: &str = "nav_bar_position";
 }
 
 // ============================================================================
@@ -47,6 +49,8 @@ mod store_keys {
 ///
 /// - Theme (System/Light/Dark)
 /// - Sidebar width
+/// - Sidebar collapsed state
+/// - Navigation bar position (Left/Right/Merged)
 /// - AI provider type (but NOT the API key - user must re-authenticate)
 ///
 /// # Parameters
@@ -82,6 +86,22 @@ pub fn init_settings_from_store<R: tauri::Runtime>(
         log::info!("Restored sidebar width: {}", width);
     }
 
+    // Restore sidebar collapsed state
+    if let Some(collapsed_value) = store.get(store_keys::SIDEBAR_COLLAPSED)
+        && let Some(collapsed) = collapsed_value.as_bool()
+    {
+        state.ui_state.write().sidebar_collapsed = collapsed;
+        log::info!("Restored sidebar collapsed: {}", collapsed);
+    }
+
+    // Restore navigation bar position
+    if let Some(position_value) = store.get(store_keys::NAV_BAR_POSITION)
+        && let Ok(position) = serde_json::from_value::<NavBarPosition>(position_value)
+    {
+        *state.nav_bar_position.write() = position;
+        log::info!("Restored nav bar position: {:?}", position);
+    }
+
     // Restore AI provider type (API key is loaded separately via keyring)
     if let Some(provider_value) = store.get(store_keys::AI_PROVIDER_TYPE)
         && let Ok(provider) = serde_json::from_value::<AIProviderType>(provider_value)
@@ -89,10 +109,7 @@ pub fn init_settings_from_store<R: tauri::Runtime>(
     {
         // Try to load the API key from keyring
         if let Ok(Some(api_key)) = super::keyring::get_api_key(provider) {
-            *state.ai_provider_config.write() = Some(AIProviderConfig {
-                provider,
-                api_key,
-            });
+            *state.ai_provider_config.write() = Some(AIProviderConfig { provider, api_key });
             log::info!("Restored AI provider: {:?} (with API key)", provider);
         } else {
             log::info!(
@@ -174,12 +191,65 @@ pub fn set_theme(theme: Theme, app: AppHandle, state: State<'_, AppState>) -> Re
 ///
 /// - `app` - Tauri AppHandle for accessing the store
 /// - `width` - The new sidebar width in pixels
-pub fn persist_sidebar_width<R: tauri::Runtime>(app: &AppHandle<R>, width: f32) -> Result<(), String> {
+pub fn persist_sidebar_width<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    width: f32,
+) -> Result<(), String> {
     let store = app
         .store(SETTINGS_STORE)
         .map_err(|e| format!("Failed to open settings store: {}", e))?;
 
     store.set(store_keys::SIDEBAR_WIDTH, json!(width));
+    store
+        .save()
+        .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+    Ok(())
+}
+
+/// Persists the sidebar collapsed state to the settings store.
+///
+/// This is called from the UI state commands when sidebar collapsed state changes.
+/// It's a helper function, not a direct Tauri command.
+///
+/// # Parameters
+///
+/// - `app` - Tauri AppHandle for accessing the store
+/// - `collapsed` - Whether the sidebar is collapsed
+pub fn persist_sidebar_collapsed<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    collapsed: bool,
+) -> Result<(), String> {
+    let store = app
+        .store(SETTINGS_STORE)
+        .map_err(|e| format!("Failed to open settings store: {}", e))?;
+
+    store.set(store_keys::SIDEBAR_COLLAPSED, json!(collapsed));
+    store
+        .save()
+        .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+    Ok(())
+}
+
+/// Persists the navigation bar position to the settings store.
+///
+/// This is called from the settings commands when nav bar position changes.
+/// It's a helper function, not a direct Tauri command.
+///
+/// # Parameters
+///
+/// - `app` - Tauri AppHandle for accessing the store
+/// - `position` - The navigation bar position
+pub fn persist_nav_bar_position<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    position: NavBarPosition,
+) -> Result<(), String> {
+    let store = app
+        .store(SETTINGS_STORE)
+        .map_err(|e| format!("Failed to open settings store: {}", e))?;
+
+    store.set(store_keys::NAV_BAR_POSITION, json!(position));
     store
         .save()
         .map_err(|e| format!("Failed to save settings: {}", e))?;
@@ -376,9 +446,7 @@ pub fn get_saved_providers() -> Vec<AIProviderType> {
 
     providers
         .into_iter()
-        .filter(|&provider| {
-            super::keyring::has_api_key(provider).unwrap_or(false)
-        })
+        .filter(|&provider| super::keyring::has_api_key(provider).unwrap_or(false))
         .collect()
 }
 
@@ -480,10 +548,61 @@ pub fn delete_saved_provider(
         // Clear in-memory state
         *state.ai_provider_config.write() = None;
 
-        log::info!("Deleted API key and cleared active provider: {:?}", provider);
+        log::info!(
+            "Deleted API key and cleared active provider: {:?}",
+            provider
+        );
     } else {
         log::info!("Deleted saved API key for provider: {:?}", provider);
     }
 
+    Ok(())
+}
+
+// ============================================================================
+// NAVIGATION BAR POSITION COMMANDS
+// ============================================================================
+
+/// Gets the current navigation bar position setting.
+///
+/// # Parameters
+///
+/// - `state` - Tauri-managed application state
+///
+/// # Returns
+///
+/// The current navigation bar position (Left, Right, or Merged).
+#[tauri::command]
+pub fn get_nav_bar_position(state: State<'_, AppState>) -> NavBarPosition {
+    *state.nav_bar_position.read()
+}
+
+/// Sets the navigation bar position.
+///
+/// This immediately updates the position state and persists it to the store.
+///
+/// # Parameters
+///
+/// - `position` - The new navigation bar position
+/// - `app` - Tauri AppHandle for accessing store
+/// - `state` - Tauri-managed application state
+///
+/// # Returns
+///
+/// - `Ok(())` on success
+/// - `Err(String)` if persistence fails
+#[tauri::command]
+pub fn set_nav_bar_position(
+    position: NavBarPosition,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    // Update in-memory state
+    *state.nav_bar_position.write() = position;
+
+    // Persist to store
+    persist_nav_bar_position(&app, position)?;
+
+    log::info!("Navigation bar position set to: {:?}", position);
     Ok(())
 }

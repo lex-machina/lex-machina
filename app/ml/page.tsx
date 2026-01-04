@@ -5,7 +5,6 @@ import { Brain, Sparkles, Eye, Target, Table2 } from "lucide-react";
 
 import { useFileState } from "@/lib/hooks/use-file-state";
 import AppShell from "@/components/layout/app-shell";
-import ContextSidebar from "@/components/layout/context-sidebar";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/utils";
 
@@ -61,15 +60,6 @@ function NoFileLoadedState() {
 }
 
 /**
- * ML Toolbar - Actions for the ML page.
- */
-const MLToolbar = () => {
-    return (
-        <span className="text-muted-foreground text-sm">Machine Learning</span>
-    );
-};
-
-/**
  * ML Sidebar - Model configuration and training options.
  */
 const MLSidebar = () => {
@@ -77,7 +67,7 @@ const MLSidebar = () => {
 
     if (!fileInfo) {
         return (
-            <div className="p-5">
+            <div className="p-4">
                 <p className="text-muted-foreground text-sm">
                     Load a file to train models
                 </p>
@@ -86,7 +76,7 @@ const MLSidebar = () => {
     }
 
     return (
-        <div className="space-y-5 p-5">
+        <div className="space-y-5 p-4">
             <section>
                 <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
                     Dataset
@@ -161,14 +151,7 @@ const MLContent = () => {
  */
 const MLPage = () => {
     return (
-        <AppShell
-            toolbar={<MLToolbar />}
-            sidebar={
-                <ContextSidebar visible={true}>
-                    <MLSidebar />
-                </ContextSidebar>
-            }
-        >
+        <AppShell sidebar={<MLSidebar />}>
             <MLContent />
         </AppShell>
     );

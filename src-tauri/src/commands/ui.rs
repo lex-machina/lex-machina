@@ -2,6 +2,7 @@
 //!
 //! This module provides commands for managing UI layout state:
 //! - Sidebar width
+//! - Sidebar collapsed state
 //! - Column widths
 //! - Grid scroll position
 //!
@@ -221,4 +222,75 @@ pub fn set_grid_scroll(row_index: usize, scroll_left: f32, state: State<'_, AppS
     let mut guard = state.ui_state.write();
     guard.grid_scroll.row_index = row_index;
     guard.grid_scroll.scroll_left = scroll_left;
+}
+
+// ============================================================================
+// SIDEBAR COLLAPSED COMMANDS
+// ============================================================================
+
+/// Toggles the sidebar collapsed state.
+///
+/// This toggles between expanded and collapsed states, persists the change,
+/// and returns the new collapsed state.
+///
+/// # Parameters
+///
+/// - `app` - Tauri AppHandle for accessing the settings store
+/// - `state` - Tauri-managed application state
+///
+/// # Returns
+///
+/// The new collapsed state (true = collapsed, false = expanded).
+///
+/// # Frontend Usage
+///
+/// ```typescript
+/// const newState = await invoke<boolean>("toggle_sidebar");
+/// // newState is true if now collapsed, false if now expanded
+/// ```
+#[tauri::command]
+pub fn toggle_sidebar(app: AppHandle, state: State<'_, AppState>) -> bool {
+    let mut guard = state.ui_state.write();
+    let new_collapsed = !guard.sidebar_collapsed;
+    guard.sidebar_collapsed = new_collapsed;
+    drop(guard); // Release lock before IO
+
+    // Persist to settings store (best effort - don't fail the command)
+    if let Err(e) = super::settings::persist_sidebar_collapsed(&app, new_collapsed) {
+        log::warn!("Failed to persist sidebar collapsed state: {}", e);
+    }
+
+    new_collapsed
+}
+
+/// Sets the sidebar collapsed state explicitly.
+///
+/// Unlike `toggle_sidebar`, this sets the state to a specific value.
+/// Useful for programmatic control or restoring state.
+///
+/// # Parameters
+///
+/// - `collapsed` - The new collapsed state (true = collapsed, false = expanded)
+/// - `app` - Tauri AppHandle for accessing the settings store
+/// - `state` - Tauri-managed application state
+///
+/// # Frontend Usage
+///
+/// ```typescript
+/// // Collapse the sidebar
+/// await invoke("set_sidebar_collapsed", { collapsed: true });
+///
+/// // Expand the sidebar
+/// await invoke("set_sidebar_collapsed", { collapsed: false });
+/// ```
+#[tauri::command]
+pub fn set_sidebar_collapsed(collapsed: bool, app: AppHandle, state: State<'_, AppState>) {
+    let mut guard = state.ui_state.write();
+    guard.sidebar_collapsed = collapsed;
+    drop(guard); // Release lock before IO
+
+    // Persist to settings store (best effort - don't fail the command)
+    if let Err(e) = super::settings::persist_sidebar_collapsed(&app, collapsed) {
+        log::warn!("Failed to persist sidebar collapsed state: {}", e);
+    }
 }
