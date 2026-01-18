@@ -6,7 +6,7 @@ description = "AI-optional data processing library for machine learning pipeline
 readme = "README.md"
 keywords = ["data-processing", "machine-learning", "polars", "automl"]
 categories = ["science", "data-structures"]
-rust-version = "1.94.0"
+rust-version = "1.92.0"
 
 [lib]
 name = "lex_processing"

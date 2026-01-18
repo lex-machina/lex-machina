@@ -118,8 +118,8 @@ class PreprocessingStage:
 
         context.preprocessor = preprocessor
         # Store transformed data temporarily for split stage
-        context._X_transformed = X_transformed  # type: ignore[attr-defined]
-        context._y_transformed = y_transformed  # type: ignore[attr-defined]
+        context._X_transformed = X_transformed
+        context._y_transformed = y_transformed
 
         return context
 

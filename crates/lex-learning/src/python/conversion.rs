@@ -492,16 +492,11 @@ pub fn extract_training_result(
 pub fn extract_metrics(py_metrics: &Bound<'_, PyAny>) -> Result<Metrics, LexLearningError> {
     // Helper to extract optional f64 field
     let get_opt_f64 = |attr: &str| -> Option<f64> {
-        py_metrics
-            .getattr(attr)
-            .ok()
-            .and_then(|v| {
-                if v.is_none() {
-                    None
-                } else {
-                    v.extract().ok()
-                }
-            })
+        py_metrics.getattr(attr).ok().and_then(
+            |v| {
+                if v.is_none() { None } else { v.extract().ok() }
+            },
+        )
     };
 
     Ok(Metrics {
@@ -859,46 +854,36 @@ pub fn extract_prediction_result(
     let prediction_json = py_any_to_json(py, &prediction)?;
 
     // Get optional probability (confidence) - single value for predicted class
-    let confidence = py_dict
-        .get_item("probability")
-        .ok()
-        .and_then(|p| {
-            if p.is_none() {
-                None
-            } else {
-                p.extract::<f64>().ok()
-            }
-        });
+    let confidence = py_dict.get_item("probability").ok().and_then(|p| {
+        if p.is_none() {
+            None
+        } else {
+            p.extract::<f64>().ok()
+        }
+    });
 
     // Get optional full probabilities dict
-    let probabilities = py_dict
-        .get_item("probabilities")
-        .ok()
-        .and_then(|p| {
-            if p.is_none() {
-                None
-            } else {
-                // Extract as HashMap<String, f64>
-                let mut map = HashMap::new();
-                if let Ok(items) = p.call_method0("items")
-                    && let Ok(iter) = items.try_iter()
-                {
-                    for item in iter.flatten() {
-                        if let (Ok(key), Ok(value)) = (
-                            item.get_item(0).and_then(|k| k.extract::<String>()),
-                            item.get_item(1).and_then(|v| v.extract::<f64>()),
-                        ) {
-                            map.insert(key, value);
-                        }
+    let probabilities = py_dict.get_item("probabilities").ok().and_then(|p| {
+        if p.is_none() {
+            None
+        } else {
+            // Extract as HashMap<String, f64>
+            let mut map = HashMap::new();
+            if let Ok(items) = p.call_method0("items")
+                && let Ok(iter) = items.try_iter()
+            {
+                for item in iter.flatten() {
+                    if let (Ok(key), Ok(value)) = (
+                        item.get_item(0).and_then(|k| k.extract::<String>()),
+                        item.get_item(1).and_then(|v| v.extract::<f64>()),
+                    ) {
+                        map.insert(key, value);
                     }
                 }
-                if map.is_empty() {
-                    None
-                } else {
-                    Some(map)
-                }
             }
-        });
+            if map.is_empty() { None } else { Some(map) }
+        }
+    });
 
     Ok(PredictionResult {
         prediction: prediction_json,
@@ -1008,10 +993,9 @@ mod tests {
             let original_df = create_test_dataframe();
 
             // Rust -> Python -> Rust
-            let py_df = dataframe_to_python(py, &original_df)
-                .expect("Failed to convert to Python");
-            let result_df = python_to_dataframe(py, &py_df)
-                .expect("Failed to convert back to Rust");
+            let py_df = dataframe_to_python(py, &original_df).expect("Failed to convert to Python");
+            let result_df =
+                python_to_dataframe(py, &py_df).expect("Failed to convert back to Rust");
 
             // Verify shape
             assert_eq!(original_df.shape(), result_df.shape());
@@ -1030,10 +1014,9 @@ mod tests {
         Python::attach(|py| {
             let original_df = create_test_dataframe();
 
-            let py_df = dataframe_to_python(py, &original_df)
-                .expect("Failed to convert to Python");
-            let result_df = python_to_dataframe(py, &py_df)
-                .expect("Failed to convert back to Rust");
+            let py_df = dataframe_to_python(py, &original_df).expect("Failed to convert to Python");
+            let result_df =
+                python_to_dataframe(py, &py_df).expect("Failed to convert back to Rust");
 
             // Check that we have the expected columns
             // Note: exact dtype preservation depends on Arrow's type mapping
@@ -1082,10 +1065,9 @@ mod tests {
             }
             .expect("Failed to create DataFrame with special column names");
 
-            let py_df = dataframe_to_python(py, &df)
-                .expect("Failed to convert to Python");
-            let result_df = python_to_dataframe(py, &py_df)
-                .expect("Failed to convert back to Rust");
+            let py_df = dataframe_to_python(py, &df).expect("Failed to convert to Python");
+            let result_df =
+                python_to_dataframe(py, &py_df).expect("Failed to convert back to Rust");
 
             assert_eq!(df.get_column_names(), result_df.get_column_names());
         });

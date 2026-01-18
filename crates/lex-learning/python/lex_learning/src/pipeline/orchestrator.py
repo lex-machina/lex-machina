@@ -153,11 +153,23 @@ class Pipeline:
 
     def _build_result(self, context: PipelineContext, training_time: float) -> TrainingResult:
         """Build TrainingResult from completed context."""
-        # Ensure required fields are present
-        assert context.model_results is not None
-        assert context.metrics is not None
-        assert context.preprocessor is not None
-        assert context.target_column is not None
+        # Ensure required fields are present (these should never be None after successful pipeline)
+        if context.model_results is None:
+            raise RuntimeError(
+                "No model results available after training - pipeline stage failed silently"
+            )
+        if context.metrics is None:
+            raise RuntimeError(
+                "No metrics available after evaluation - pipeline stage failed silently"
+            )
+        if context.preprocessor is None:
+            raise RuntimeError(
+                "No preprocessor available after preprocessing - pipeline stage failed silently"
+            )
+        if context.target_column is None:
+            raise RuntimeError(
+                "No target column set after validation - pipeline stage failed silently"
+            )
 
         return TrainingResult(
             success=True,

@@ -293,7 +293,10 @@ fn get_app_data_dir() -> Result<PathBuf, String> {
             return Ok(PathBuf::from(xdg_data).join(APP_NAME));
         }
         if let Ok(home) = env::var("HOME") {
-            return Ok(PathBuf::from(home).join(".local").join("share").join(APP_NAME));
+            return Ok(PathBuf::from(home)
+                .join(".local")
+                .join("share")
+                .join(APP_NAME));
         }
     }
 
@@ -363,15 +366,13 @@ fn extract_python_source() -> Result<PathBuf, String> {
 
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!("Failed to create directory {}: {}", parent.display(), e)
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
         }
 
         // Write the file
-        fs::write(&file_path, file.content).map_err(|e| {
-            format!("Failed to write {}: {}", file_path.display(), e)
-        })?;
+        fs::write(&file_path, file.content)
+            .map_err(|e| format!("Failed to write {}: {}", file_path.display(), e))?;
     }
 
     Ok(python_dir)
@@ -530,11 +531,11 @@ fn fix_sys_executable(runtime_dir: &Path) -> Result<(), String> {
 fn verify_python_setup() -> Result<(), String> {
     pyo3::Python::attach(|py| {
         // Try importing the lex_learning module
-        py.import("lex_learning")
+        let lex_learning = py
+            .import("lex_learning")
             .map_err(|e| format!("Failed to import lex_learning: {}", e))?;
 
         // Verify we can access key classes
-        let lex_learning = py.import("lex_learning").unwrap();
         lex_learning
             .getattr("Pipeline")
             .map_err(|e| format!("Failed to access Pipeline class: {}", e))?;
@@ -659,7 +660,11 @@ mod tests {
         let dir = find_runtime_dir();
         assert!(dir.is_ok(), "Failed to find runtime: {:?}", dir);
         let dir = dir.unwrap();
-        assert!(dir.exists(), "Runtime dir does not exist: {}", dir.display());
+        assert!(
+            dir.exists(),
+            "Runtime dir does not exist: {}",
+            dir.display()
+        );
         assert!(
             dir.join("bin").join("python3").exists() || dir.join("python.exe").exists(),
             "Python executable not found in runtime"

@@ -302,7 +302,11 @@ mod tests {
     fn test_all_files_have_content() {
         for file in EMBEDDED_FILES {
             assert!(!file.path.is_empty(), "File path should not be empty");
-            assert!(!file.content.is_empty(), "File {} should have content", file.path);
+            assert!(
+                !file.content.is_empty(),
+                "File {} should have content",
+                file.path
+            );
         }
     }
 

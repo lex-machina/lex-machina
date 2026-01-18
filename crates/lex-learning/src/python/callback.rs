@@ -206,9 +206,7 @@ fn extract_progress_update(py_update: &Bound<'_, PyAny>) -> PyResult<ProgressUpd
     // Extract stage: Python enum -> .value string -> Rust enum
     let stage_obj = py_update.getattr("stage")?;
     let stage_str: String = stage_obj.getattr("value")?.extract()?;
-    let stage = stage_str
-        .parse()
-        .unwrap_or(TrainingStage::Initializing);
+    let stage = stage_str.parse().unwrap_or(TrainingStage::Initializing);
 
     // Extract required fields
     let progress: f64 = py_update.getattr("progress")?.extract()?;
@@ -248,13 +246,9 @@ fn extract_progress_update(py_update: &Bound<'_, PyAny>) -> PyResult<ProgressUpd
 /// This is intentional for optional fields where missing/invalid values should
 /// not abort the entire extraction.
 fn extract_optional_string(obj: &Bound<'_, PyAny>, attr: &str) -> Option<String> {
-    obj.getattr(attr).ok().and_then(|v| {
-        if v.is_none() {
-            None
-        } else {
-            v.extract().ok()
-        }
-    })
+    obj.getattr(attr)
+        .ok()
+        .and_then(|v| if v.is_none() { None } else { v.extract().ok() })
 }
 
 /// Extract an optional `(u32, u32)` tuple attribute from a Python object.
@@ -279,20 +273,16 @@ fn extract_optional_string(obj: &Bound<'_, PyAny>, attr: &str) -> Option<String>
 /// This is intentional for optional fields where missing/invalid values should
 /// not abort the entire extraction.
 fn extract_optional_tuple(obj: &Bound<'_, PyAny>, attr: &str) -> Option<(u32, u32)> {
-    obj.getattr(attr).ok().and_then(|v| {
-        if v.is_none() {
-            None
-        } else {
-            v.extract().ok()
-        }
-    })
+    obj.getattr(attr)
+        .ok()
+        .and_then(|v| if v.is_none() { None } else { v.extract().ok() })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     #[test]
     fn test_py_progress_callback_creation() {

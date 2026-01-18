@@ -550,8 +550,8 @@ mod tests {
     #[ignore = "Requires Python runtime with ML libraries"]
     fn test_train_with_progress_callback() {
         use polars::prelude::*;
-        use std::sync::atomic::{AtomicU32, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
 
         crate::initialize().expect("Failed to initialize Python");
 

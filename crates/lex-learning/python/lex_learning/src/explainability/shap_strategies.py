@@ -9,15 +9,12 @@ from __future__ import annotations
 import logging
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ..config import ProblemType
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

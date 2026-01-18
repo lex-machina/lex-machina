@@ -319,7 +319,10 @@ mod tests {
     fn test_training_stage_as_str() {
         assert_eq!(TrainingStage::Initializing.as_str(), "initializing");
         assert_eq!(TrainingStage::Preprocessing.as_str(), "preprocessing");
-        assert_eq!(TrainingStage::AlgorithmSelection.as_str(), "algorithm_selection");
+        assert_eq!(
+            TrainingStage::AlgorithmSelection.as_str(),
+            "algorithm_selection"
+        );
         assert_eq!(TrainingStage::Training.as_str(), "training");
         assert_eq!(TrainingStage::Evaluation.as_str(), "evaluation");
         assert_eq!(TrainingStage::Explainability.as_str(), "explainability");

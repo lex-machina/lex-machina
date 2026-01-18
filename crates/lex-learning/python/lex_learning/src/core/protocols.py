@@ -66,6 +66,10 @@ class PipelineContext:
     # Training start time for calculating total duration
     start_time: float = 0.0
 
+    # Transformed data (set by preprocessing stage, consumed by split stage)
+    _X_transformed: pd.DataFrame | None = None
+    _y_transformed: pd.Series | None = None
+
 
 class PipelineStage(Protocol):
     """Protocol for pipeline stages.

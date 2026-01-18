@@ -1,6 +1,6 @@
-[target.x86_64-unknown-linux-gnu]   # Configuration for Linux target
-linker = "clang"                    # Use Clang as the linker on Linux
-rustflags = [
-    "-C", "link-arg=-fuse-ld=/usr/bin/mold",    # Force use of Mold linker
-    "-Z", "threads=4"                           # Enable parallel compilation in the compiler frontend (Nightly only)
-]
+# [target.x86_64-unknown-linux-gnu]   # Configuration for Linux target
+# linker = "clang"                    # Use Clang as the linker on Linux
+# rustflags = [
+#     "-C", "link-arg=-fuse-ld=/usr/bin/mold",    # Force use of Mold linker
+#     "-Z", "threads=4"                           # Enable parallel compilation in the compiler frontend (Nightly only)
+# ]

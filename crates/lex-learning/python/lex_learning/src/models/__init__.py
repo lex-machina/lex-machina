@@ -6,6 +6,7 @@ hyperparameter search spaces for Optuna optimization.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import optuna
@@ -109,8 +110,6 @@ def get_default_params(name: str) -> dict[str, Any]:
 
 def _get_model_params(model_class: type) -> set[str]:
     """Get parameter names accepted by a model class."""
-    import inspect
-
     try:
         sig = inspect.signature(model_class.__init__)
         return set(sig.parameters.keys()) - {"self"}

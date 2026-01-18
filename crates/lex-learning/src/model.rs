@@ -480,11 +480,7 @@ impl TrainedModel {
     #[must_use = "returns the target column name; use it or handle the error"]
     pub fn target_column(&self) -> Result<String, LexLearningError> {
         Python::attach(|py| {
-            let value: String = self
-                .py_model
-                .bind(py)
-                .getattr("target_column")?
-                .extract()?;
+            let value: String = self.py_model.bind(py).getattr("target_column")?.extract()?;
             Ok(value)
         })
     }
@@ -507,11 +503,7 @@ impl TrainedModel {
     #[must_use = "returns feature names; use them or handle the error"]
     pub fn feature_names(&self) -> Result<Vec<String>, LexLearningError> {
         Python::attach(|py| {
-            let value: Vec<String> = self
-                .py_model
-                .bind(py)
-                .getattr("feature_names")?
-                .extract()?;
+            let value: Vec<String> = self.py_model.bind(py).getattr("feature_names")?.extract()?;
             Ok(value)
         })
     }
@@ -734,13 +726,7 @@ fn extract_metrics_from_dict(py_dict: &Bound<'_, PyAny>) -> Result<Metrics, LexL
         py_dict
             .get_item(key)
             .ok()
-            .and_then(|v| {
-                if v.is_none() {
-                    None
-                } else {
-                    v.extract().ok()
-                }
-            })
+            .and_then(|v| if v.is_none() { None } else { v.extract().ok() })
     };
 
     Ok(Metrics {
@@ -873,7 +859,10 @@ mod tests {
     fn test_load_nonexistent_file() {
         // Should return ModelNotFound error without calling Python
         let result = TrainedModel::load("/nonexistent/path/model.pkl");
-        assert!(matches!(result, Err(LexLearningError::ModelNotFound { .. })));
+        assert!(matches!(
+            result,
+            Err(LexLearningError::ModelNotFound { .. })
+        ));
     }
 
     #[test]
