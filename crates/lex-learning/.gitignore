@@ -20,7 +20,10 @@ wheels/
 *.egg
 
 # Runtime
-linux-x86_64/*
+runtime/python/*/bin/
+runtime/python/*/include/
+runtime/python/*/lib/
+runtime/python/*/share/
 
 # Virtual environments
 venv/
