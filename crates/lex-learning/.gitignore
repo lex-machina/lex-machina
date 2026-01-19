@@ -19,6 +19,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Runtime
+linux-x86_64/*
+
 # Virtual environments
 venv/
 .venv/
