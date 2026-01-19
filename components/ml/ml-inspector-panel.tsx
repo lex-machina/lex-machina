@@ -1,41 +1,29 @@
 "use client";
+"use client";
 
-import { useCallback, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useState, type ChangeEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import { useML } from "@/lib/hooks/use-ml";
 import type {
-    ColumnInfo,
     MLTrainingStatus,
     MLUIState,
     TrainingHistoryEntry,
 } from "@/types";
 import { cn } from "@/lib/utils";
+import { useML } from "@/lib/hooks/use-ml";
 import { Toggle } from "@/components/ui/toggle";
 import { Select, type SelectOption } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import {
-    Card,
-    CardHeader,
-    CardContent,
-    CardFooter,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { TrainingHistory } from "@/components/ml/training-history";
 
-interface MLSidebarProps {
+interface MLInspectorPanelProps {
     uiState: MLUIState;
     setUIState: (state: MLUIState) => void;
-    availableColumns: ColumnInfo[];
     trainingStatus: MLTrainingStatus;
     onSelectHistory: (entry: TrainingHistoryEntry) => void;
 }
-
-const problemTypeOptions: SelectOption[] = [
-    { value: "classification", label: "Classification" },
-    { value: "regression", label: "Regression" },
-];
 
 const algorithmOptions: SelectOption[] = [
     { value: "", label: "Auto-select" },
@@ -59,87 +47,18 @@ function updateConfig(state: MLUIState, next: Partial<MLUIState>): MLUIState {
     };
 }
 
-export function MLSidebar({
+export function MLInspectorPanel({
     uiState,
     setUIState,
-    availableColumns,
     trainingStatus,
     onSelectHistory,
-}: MLSidebarProps) {
+}: MLInspectorPanelProps) {
     const { getHistory, clearHistory } = useML();
     const [advancedOpen, setAdvancedOpen] = useState(true);
-    const [featuresOpen, setFeaturesOpen] = useState(false);
     const [history, setHistory] = useState<TrainingHistoryEntry[]>([]);
 
     const isTraining = trainingStatus === "training";
     const manualDisabled = isTraining || uiState.smart_mode;
-
-    const columnOptions = useMemo<SelectOption[]>(() => {
-        return availableColumns.map((col) => ({
-            value: col.name,
-            label: col.name,
-        }));
-    }, [availableColumns]);
-
-    const featureColumns = useMemo(() => {
-        return availableColumns.filter(
-            (col) => col.name !== uiState.target_column,
-        );
-    }, [availableColumns, uiState.target_column]);
-
-    const excludedSet = useMemo(
-        () => new Set(uiState.excluded_columns),
-        [uiState.excluded_columns],
-    );
-
-    const handleToggleMode = useCallback(
-        (smart: boolean) => {
-            setUIState(
-                updateConfig(uiState, {
-                    smart_mode: smart,
-                }),
-            );
-        },
-        [uiState, setUIState],
-    );
-
-    const handleTargetChange = useCallback(
-        (value: string) => {
-            setUIState(
-                updateConfig(uiState, {
-                    target_column: value || null,
-                    excluded_columns: uiState.excluded_columns.filter(
-                        (name) => name !== value,
-                    ),
-                }),
-            );
-        },
-        [uiState, setUIState],
-    );
-
-    const handleProblemType = useCallback(
-        (value: string) => {
-            setUIState(
-                updateConfig(uiState, {
-                    problem_type: value,
-                }),
-            );
-        },
-        [uiState, setUIState],
-    );
-
-    const handleFeatureToggle = useCallback(
-        (column: string, enabled: boolean) => {
-            const next = new Set(uiState.excluded_columns);
-            if (enabled) {
-                next.delete(column);
-            } else {
-                next.add(column);
-            }
-            setUIState(updateConfig(uiState, { excluded_columns: [...next] }));
-        },
-        [uiState, setUIState],
-    );
 
     const handleHistoryRefresh = useCallback(async () => {
         const entries = await getHistory();
@@ -152,101 +71,9 @@ export function MLSidebar({
         setHistory([]);
     }, [clearHistory]);
 
-    const targetDisabled = availableColumns.length === 0;
-
     return (
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col border-l">
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-                <Card>
-                    <CardHeader title="Mode" />
-                    <CardContent padded>
-                        <Toggle
-                            pressed={uiState.smart_mode}
-                            onPressedChange={handleToggleMode}
-                            label={
-                                uiState.smart_mode
-                                    ? "Smart mode"
-                                    : "Manual mode"
-                            }
-                            description={
-                                uiState.smart_mode
-                                    ? "Auto-selects algorithms and settings"
-                                    : "Customize algorithms and tuning"
-                            }
-                        />
-                    </CardContent>
-                </Card>
-
-                <Card className={cn(targetDisabled && "opacity-60")}>
-                    <CardHeader title="Target" />
-                    <CardContent padded>
-                        <Select
-                            label="Target column"
-                            value={uiState.target_column ?? ""}
-                            options={[
-                                { value: "", label: "Select target" },
-                                ...columnOptions,
-                            ]}
-                            onValueChange={handleTargetChange}
-                            disabled={targetDisabled}
-                        />
-                        <div className="mt-3">
-                            <Select
-                                label="Problem type"
-                                value={uiState.problem_type}
-                                options={problemTypeOptions}
-                                onValueChange={handleProblemType}
-                                disabled={targetDisabled}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className={cn(targetDisabled && "opacity-60")}>
-                    <CardHeader
-                        title="Features"
-                        actions={
-                            <button
-                                type="button"
-                                onClick={() => setFeaturesOpen((open) => !open)}
-                                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
-                            >
-                                {featuresOpen ? "Hide" : "Show"}
-                                {featuresOpen ? (
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                ) : (
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                )}
-                            </button>
-                        }
-                    />
-                    {featuresOpen && (
-                        <CardContent className="max-h-56 overflow-y-auto">
-                            <div className="flex flex-col gap-2 p-3">
-                                {featureColumns.map((col) => (
-                                    <Checkbox
-                                        key={col.name}
-                                        checked={!excludedSet.has(col.name)}
-                                        onCheckedChange={(checked) =>
-                                            handleFeatureToggle(
-                                                col.name,
-                                                checked,
-                                            )
-                                        }
-                                        label={col.name}
-                                        disabled={targetDisabled}
-                                    />
-                                ))}
-                            </div>
-                        </CardContent>
-                    )}
-                    <CardFooter className="text-muted-foreground text-xs">
-                        {featuresOpen
-                            ? `${featureColumns.length} selectable features`
-                            : `${featureColumns.length} selected by default`}
-                    </CardFooter>
-                </Card>
-
                 <Card className={cn(manualDisabled && "opacity-60")}>
                     <CardHeader
                         title="Advanced"

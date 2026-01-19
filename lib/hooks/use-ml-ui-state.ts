@@ -15,30 +15,32 @@ export interface UseMLUIStateReturn {
     setUIState: (state: MLUIState) => void;
 }
 
+export const defaultMLUIState: MLUIState = {
+    smart_mode: true,
+    target_column: null,
+    problem_type: "classification",
+    excluded_columns: [],
+    use_processed_data: false,
+    config: {
+        optimize_hyperparams: true,
+        n_trials: 10,
+        cv_folds: 5,
+        test_size: 0.2,
+        enable_neural_networks: false,
+        enable_explainability: true,
+        top_k_algorithms: 3,
+        algorithm: undefined,
+    },
+    active_tab: "overview",
+};
+
 // ============================================================================
 // HOOK
 // ============================================================================
 
 export function useMLUIState(fileInfo: FileInfo | null): UseMLUIStateReturn {
     const [isLoaded, setIsLoaded] = useState(false);
-    const [uiState, setUIState] = useState<MLUIState>({
-        smart_mode: true,
-        target_column: null,
-        problem_type: "",
-        excluded_columns: [],
-        use_processed_data: false,
-        config: {
-            optimize_hyperparams: true,
-            n_trials: 10,
-            cv_folds: 5,
-            test_size: 0.2,
-            enable_neural_networks: false,
-            enable_explainability: true,
-            top_k_algorithms: 3,
-            algorithm: undefined,
-        },
-        active_tab: "results",
-    });
+    const [uiState, setUIState] = useState<MLUIState>(defaultMLUIState);
 
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,7 +53,11 @@ export function useMLUIState(fileInfo: FileInfo | null): UseMLUIStateReturn {
             try {
                 const savedState = await invoke<MLUIState>("get_ml_ui_state");
                 if (savedState) {
-                    setUIState(savedState);
+                    setUIState({
+                        ...savedState,
+                        problem_type:
+                            savedState.problem_type || "classification",
+                    });
                 }
                 setIsLoaded(true);
             } catch (err) {
