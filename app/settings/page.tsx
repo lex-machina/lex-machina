@@ -13,6 +13,7 @@ import {
     AIProviderConfig,
     NavPositionSelector,
 } from "@/components/settings";
+import { Toggle } from "@/components/ui/toggle";
 
 // ============================================================================
 // CONSTANTS
@@ -53,6 +54,8 @@ export default function SettingsPage() {
         validateAPIKey,
         validationStatus,
         validationError,
+        autoStartMLKernel,
+        setAutoStartMLKernel,
         isLoading,
         refresh,
     } = useSettings();
@@ -124,6 +127,27 @@ export default function SettingsPage() {
                                                 onChange={
                                                     requestSetNavBarPosition
                                                 }
+                                            />
+                                        </div>
+
+                                        {/* ML Kernel Section */}
+                                        <div className="mt-6">
+                                            <div className="mb-4 flex flex-col gap-2">
+                                                <h3 className="text-sm font-medium">
+                                                    Machine Learning
+                                                </h3>
+                                                <p className="text-muted-foreground text-xs">
+                                                    Control how the ML kernel
+                                                    starts up
+                                                </p>
+                                            </div>
+                                            <Toggle
+                                                pressed={autoStartMLKernel}
+                                                onPressedChange={
+                                                    setAutoStartMLKernel
+                                                }
+                                                label="Auto-start ML kernel"
+                                                description="Start the ML runtime when the app opens"
                                             />
                                         </div>
                                     </div>

@@ -191,6 +191,24 @@ pub fn run() {
             commands::get_preprocessing_ui_state,
             // Saves preprocessing page state for navigation persistence
             commands::set_preprocessing_ui_state,
+            // ML commands
+            commands::is_ml_initialized,
+            commands::initialize_ml,
+            commands::start_training,
+            commands::cancel_training,
+            commands::get_training_result,
+            commands::get_shap_plot,
+            commands::get_model_info,
+            commands::save_model,
+            commands::load_model,
+            commands::predict_single,
+            commands::predict_batch,
+            commands::get_training_history,
+            commands::clear_training_history,
+            commands::get_ml_ui_state,
+            commands::set_ml_ui_state,
+            commands::get_auto_start_ml_kernel,
+            commands::set_auto_start_ml_kernel,
         ])
         // ====================================================================
         // SETUP HOOK

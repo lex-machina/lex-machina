@@ -2676,6 +2676,7 @@ dependencies = [
  "pyo3",
  "serde",
  "serde_json",
+ "static_assertions",
  "thiserror 2.0.17",
 ]
 
@@ -2706,8 +2707,10 @@ dependencies = [
 name = "lex_machina"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "keyring",
+ "lex-learning",
  "lex-processing",
  "log",
  "parking_lot",

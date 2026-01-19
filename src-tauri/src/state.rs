@@ -55,6 +55,7 @@
 //! - `preprocessing_history` - Transient processing history
 //! - `processed_dataframe` - Can be regenerated from source
 
+use lex_learning::{CancellationToken as MLCancellationToken, TrainingResult};
 use lex_processing::{CancellationToken, PipelineConfig, PreprocessingSummary};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -452,6 +453,151 @@ impl Default for PreprocessingUIConfig {
 }
 
 // ============================================================================
+// ML STATE TYPES
+// ============================================================================
+
+/// UI state for the ML page.
+///
+/// This captures the user's ML configuration so it persists across navigation.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::MLUIState`
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MLUIState {
+    /// true = automatic mode, false = manual mode
+    pub smart_mode: bool,
+    /// Selected target column for prediction
+    pub target_column: Option<String>,
+    /// Problem type ("classification" or "regression")
+    pub problem_type: String,
+    /// Columns to exclude from features
+    pub excluded_columns: Vec<String>,
+    /// Whether to use processed or original data
+    pub use_processed_data: bool,
+    /// ML configuration settings
+    pub config: MLConfigUIState,
+    /// Active tab in the results panel
+    pub active_tab: String,
+}
+
+/// ML configuration UI state.
+///
+/// Mirrors the frontend MLConfigUIState type.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::MLConfigUIState`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MLConfigUIState {
+    /// Whether to optimize hyperparameters with Optuna
+    pub optimize_hyperparams: bool,
+    /// Number of Optuna trials for hyperparameter optimization
+    pub n_trials: u32,
+    /// Number of cross-validation folds
+    pub cv_folds: u32,
+    /// Train/test split ratio (0.0-1.0)
+    pub test_size: f64,
+    /// Whether to include neural networks in model selection
+    pub enable_neural_networks: bool,
+    /// Whether to compute SHAP explainability plots
+    pub enable_explainability: bool,
+    /// Number of top algorithms to compare
+    pub top_k_algorithms: u32,
+    /// Optional algorithm override
+    pub algorithm: Option<String>,
+}
+
+impl Default for MLConfigUIState {
+    fn default() -> Self {
+        Self {
+            optimize_hyperparams: true,
+            n_trials: 10,
+            cv_folds: 5,
+            test_size: 0.2,
+            enable_neural_networks: false,
+            enable_explainability: true,
+            top_k_algorithms: 3,
+            algorithm: None,
+        }
+    }
+}
+
+/// A snapshot of ML configuration for history entries.
+///
+/// Mirrors the frontend MLConfigSnapshot type.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::MLConfigSnapshot`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MLConfigSnapshot {
+    /// Target column for prediction
+    pub target_column: String,
+    /// Problem type ("classification" or "regression")
+    pub problem_type: String,
+    /// Columns excluded from features
+    pub excluded_columns: Vec<String>,
+    /// Whether processed or original data was used
+    pub use_processed_data: bool,
+    /// Whether hyperparameter optimization was enabled
+    pub optimize_hyperparams: bool,
+    /// Number of Optuna trials
+    pub n_trials: u32,
+    /// Number of CV folds
+    pub cv_folds: u32,
+    /// Whether SHAP explainability was enabled
+    pub enable_explainability: bool,
+    /// Number of top algorithms to compare
+    pub top_k_algorithms: u32,
+    /// Optional algorithm override
+    pub algorithm: Option<String>,
+}
+
+/// Summary of a training result for history.
+///
+/// Mirrors the frontend TrainingResultSummary type.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::TrainingResultSummary`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingResultSummary {
+    /// Name of the best model
+    pub best_model_name: String,
+    /// Test set score (accuracy, R2, etc.)
+    pub test_score: f64,
+    /// Total training time in seconds
+    pub training_time_seconds: f64,
+}
+
+/// An entry in the training history.
+///
+/// Created each time training is run to allow users to view past results.
+///
+/// # Session-Only Storage
+///
+/// History is stored in memory only. Maximum 10 entries are kept.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::TrainingHistoryEntry`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingHistoryEntry {
+    /// Unique identifier (UUID)
+    pub id: String,
+    /// Unix timestamp when training completed
+    pub timestamp: i64,
+    /// Configuration used for this training run
+    pub config: MLConfigSnapshot,
+    /// Summary of the training result
+    pub result_summary: TrainingResultSummary,
+}
+
+/// Maximum number of training history entries to keep.
+pub const MAX_TRAINING_HISTORY_ENTRIES: usize = 10;
+
+// ============================================================================
 // APPLICATION STATE
 // ============================================================================
 
@@ -532,6 +678,39 @@ pub struct AppState {
     /// Persists selected columns, row range, and config across navigation.
     /// Session-only: not persisted to disk.
     pub preprocessing_ui_state: RwLock<PreprocessingUIState>,
+
+    // ============================================================================
+    // ML STATE FIELDS
+    // ============================================================================
+    /// Currently trained model (if training has completed).
+    /// Used for predictions and model persistence.
+    pub trained_model: RwLock<Option<lex_learning::TrainedModel>>,
+
+    /// Result from the most recent training run.
+    /// Contains metrics, feature importance, and SHAP plots (raw PNG bytes).
+    pub training_result: RwLock<Option<TrainingResult>>,
+
+    /// History of training runs.
+    /// Maximum [`MAX_TRAINING_HISTORY_ENTRIES`] entries, oldest removed first.
+    /// Session-only: not persisted to disk.
+    pub training_history: RwLock<Vec<TrainingHistoryEntry>>,
+
+    /// Whether ML training is currently in progress.
+    /// Used to prevent concurrent training runs and show UI state.
+    pub ml_training_in_progress: RwLock<bool>,
+
+    /// Cancellation token for ML training.
+    /// Can be used to cancel training from the UI.
+    pub ml_cancellation_token: RwLock<MLCancellationToken>,
+
+    /// Whether the Python ML runtime has been initialized.
+    /// Set to true after successful runtime initialization.
+    pub ml_runtime_initialized: RwLock<bool>,
+
+    /// UI state for the ML page.
+    /// Persists target column, config, and settings across navigation.
+    /// Session-only: not persisted to disk.
+    pub ml_ui_state: RwLock<MLUIState>,
 }
 
 impl AppState {
@@ -548,6 +727,13 @@ impl AppState {
             theme: RwLock::new(Theme::default()),
             nav_bar_position: RwLock::new(NavBarPosition::default()),
             preprocessing_ui_state: RwLock::new(PreprocessingUIState::default()),
+            trained_model: RwLock::new(None),
+            training_result: RwLock::new(None),
+            training_history: RwLock::new(Vec::new()),
+            ml_training_in_progress: RwLock::new(false),
+            ml_cancellation_token: RwLock::new(MLCancellationToken::new()),
+            ml_runtime_initialized: RwLock::new(false),
+            ml_ui_state: RwLock::new(MLUIState::default()),
         }
     }
 }

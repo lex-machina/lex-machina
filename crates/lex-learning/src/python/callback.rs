@@ -72,6 +72,11 @@ use pyo3::prelude::*;
 
 use crate::progress::{ProgressCallback, ProgressUpdate, TrainingStage};
 
+/// Type alias for the cancellation check function.
+///
+/// This is a closure that returns `true` if the operation should be cancelled.
+type CancellationCheckFn = Box<dyn Fn() -> bool + Send + Sync>;
+
 /// Python-callable wrapper for Rust progress callback.
 ///
 /// This struct wraps a Rust [`ProgressCallback`] closure and exposes it as a
@@ -276,6 +281,77 @@ fn extract_optional_tuple(obj: &Bound<'_, PyAny>, attr: &str) -> Option<(u32, u3
     obj.getattr(attr)
         .ok()
         .and_then(|v| if v.is_none() { None } else { v.extract().ok() })
+}
+
+/// Python-callable wrapper for Rust cancellation check function.
+///
+/// This struct wraps a closure that checks if cancellation has been requested
+/// and exposes it as a Python callable. When Python calls the object
+/// (via `__call__`), it invokes the wrapped closure.
+///
+/// # PyO3 Integration
+///
+/// This type is marked with `#[pyclass]`, making it usable from Python.
+/// It is typically created in Rust and passed to Python's `CallbackProgressReporter`
+/// via the `cancellation_check` parameter.
+///
+/// # Thread Safety
+///
+/// The wrapped check function is `Send + Sync`, allowing safe concurrent
+/// invocation from multiple Python threads.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+/// use lex_learning::CancellationToken;
+///
+/// let token = CancellationToken::new();
+/// let check_fn = token.as_check_fn();
+///
+/// Python::attach(|py| {
+///     let py_check = Bound::new(py, PyCancellationChecker::new(check_fn))?;
+///     // Pass to Python pipeline builder
+///     builder.call_method1("on_progress", (py_callback, py_check))?;
+///     Ok(())
+/// });
+/// ```
+#[pyclass]
+pub struct PyCancellationChecker {
+    check_fn: CancellationCheckFn,
+}
+
+impl PyCancellationChecker {
+    /// Create a new [`PyCancellationChecker`] wrapping the given check function.
+    ///
+    /// # Arguments
+    ///
+    /// * `check_fn` - The closure that returns `true` if cancelled
+    ///
+    /// # Returns
+    ///
+    /// A new [`PyCancellationChecker`] instance that can be passed to Python.
+    #[must_use]
+    pub fn new(check_fn: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+        Self {
+            check_fn: Box::new(check_fn),
+        }
+    }
+}
+
+#[pymethods]
+impl PyCancellationChecker {
+    /// Check if cancellation has been requested.
+    ///
+    /// This method is invoked by Python's `CallbackProgressReporter` to check
+    /// if the operation should be cancelled.
+    ///
+    /// # Returns
+    ///
+    /// `true` if cancellation has been requested, `false` otherwise.
+    fn __call__(&self) -> bool {
+        (self.check_fn)()
+    }
 }
 
 #[cfg(test)]

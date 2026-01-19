@@ -25,15 +25,16 @@ use crate::events::AppEventEmitter;
 use crate::state::{AIProviderConfig, AIProviderType, AppState, NavBarPosition, Theme};
 
 /// The settings store filename.
-const SETTINGS_STORE: &str = "settings.json";
+pub const SETTINGS_STORE: &str = "settings.json";
 
 /// Store keys for persisted settings.
-mod store_keys {
+pub mod store_keys {
     pub const THEME: &str = "theme";
     pub const SIDEBAR_WIDTH: &str = "sidebar_width";
     pub const SIDEBAR_COLLAPSED: &str = "sidebar_collapsed";
     pub const AI_PROVIDER_TYPE: &str = "ai_provider_type";
     pub const NAV_BAR_POSITION: &str = "nav_bar_position";
+    pub const AUTO_START_ML_KERNEL: &str = "auto_start_ml_kernel";
 }
 
 // ============================================================================

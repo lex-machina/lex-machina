@@ -21,6 +21,7 @@ from ..errors import CancelledError
 from ..inference import TrainedModel
 from ..progress import (
     CallbackProgressReporter,
+    CancellationCheck,
     NullProgressReporter,
     ProgressCallback,
     ProgressReporter,
@@ -65,6 +66,7 @@ class Pipeline:
         self,
         config: PipelineConfig,
         progress_callback: ProgressCallback | None = None,
+        cancellation_check: CancellationCheck | None = None,
     ) -> None:
         """Initialize pipeline.
 
@@ -73,8 +75,8 @@ class Pipeline:
         self._config = config
         self._progress_callback = progress_callback
         self._reporter: ProgressReporter = (
-            CallbackProgressReporter(progress_callback)
-            if progress_callback
+            CallbackProgressReporter(progress_callback, cancellation_check)
+            if progress_callback or cancellation_check
             else NullProgressReporter()
         )
 
@@ -220,15 +222,21 @@ class PipelineBuilder:
     def __init__(self) -> None:
         self._config: PipelineConfig | None = None
         self._progress_callback: ProgressCallback | None = None
+        self._cancellation_check: CancellationCheck | None = None
 
     def config(self, config: PipelineConfig) -> Self:
         """Set the pipeline configuration."""
         self._config = config
         return self
 
-    def on_progress(self, callback: ProgressCallback) -> Self:
-        """Set the progress callback."""
+    def on_progress(
+        self,
+        callback: ProgressCallback | None = None,
+        cancellation_check: CancellationCheck | None = None,
+    ) -> Self:
+        """Set the progress callback and cancellation check."""
         self._progress_callback = callback
+        self._cancellation_check = cancellation_check
         return self
 
     def build(self) -> Pipeline:
@@ -239,4 +247,5 @@ class PipelineBuilder:
         return Pipeline(
             config=self._config,
             progress_callback=self._progress_callback,
+            cancellation_check=self._cancellation_check,
         )

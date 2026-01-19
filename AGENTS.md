@@ -201,6 +201,47 @@ pnpm lint                         # TypeScript linting
 
 ---
 
+## 6.1 Handling Compilation Errors
+
+When Rust code fails to compile:
+
+1. **DO NOT** simply remove code to make it compile
+2. **DO NOT** assume the approach is wrong
+3. **DO ASK** for clarification or use Context7 MCP to fetch documentation
+
+### Dependency Management
+
+| Issue                                                   | Solution                                        |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| `static_assertions` in dev-dependencies but used in lib | Move to regular dependencies                    |
+| Dependency version not found                            | Check crates.io for available versions          |
+| Feature flags not recognized                            | Fetch docs via Context7 for correct features    |
+| Trait bounds not satisfied                              | Understand the requirement, don't weaken checks |
+
+### Examples of What NOT to Do
+
+```rust
+// WRONG: Removing static assertion because it didn't compile
+// (This removes the safety guarantee)
+static_assertions::assert_impl_all!(CancellationToken: Send, Sync);  // REMOVED
+
+// WRONG: Using unwrap() in production code
+let value = some_option.unwrap();  // Panic on None!
+
+// CORRECT: Ask when unsure
+// "The static_assertions crate in dev-dependencies doesn't work for lib code.
+// Should I add it to regular dependencies, or is there another approach?"
+```
+
+### How to Research
+
+1. **Context7 MCP**: `get-library-docs` for library documentation
+2. **Web Search**: `websearch` for recent issues/solutions
+3. **Code Search**: `codesearch` for similar patterns in the codebase
+4. **Ask**: The user is happy to help - just ask!
+
+---
+
 ## 7. Development Patterns
 
 When adding new functionality, reference existing implementations:

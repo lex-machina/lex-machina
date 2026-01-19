@@ -52,13 +52,16 @@
 
 use pyo3::prelude::*;
 
+use crate::cancellation::CancellationToken;
 use crate::config::PipelineConfig;
 use crate::error::LexLearningError;
 use crate::model::TrainedModel;
 use crate::progress::ProgressCallback;
+use crate::python::callback::{PyCancellationChecker, PyProgressCallback};
 use crate::python::conversion;
 use crate::types::TrainingResult;
 use polars::prelude::DataFrame;
+use pyo3::types::PyTuple;
 
 /// The ML training pipeline.
 ///
@@ -91,6 +94,7 @@ use polars::prelude::DataFrame;
 pub struct Pipeline {
     config: PipelineConfig,
     progress_callback: Option<ProgressCallback>,
+    cancellation_token: Option<CancellationToken>,
     /// Stores the Python TrainingResult for create_trained_model()
     last_py_result: Option<Py<PyAny>>,
 }
@@ -102,6 +106,10 @@ impl std::fmt::Debug for Pipeline {
             .field(
                 "progress_callback",
                 &self.progress_callback.as_ref().map(|_| "<callback>"),
+            )
+            .field(
+                "cancellation_token",
+                &self.cancellation_token.as_ref().map(|_| "<token>"),
             )
             .field(
                 "last_py_result",
@@ -175,17 +183,30 @@ impl Pipeline {
             // 2. Convert Rust config to Python PipelineConfig
             let py_config = conversion::config_to_python(py, &self.config)?;
 
-            // 3. Build Python Pipeline with optional progress callback
+            // 3. Build Python Pipeline with optional progress callback and cancellation check
             let lex_learning = py.import("lex_learning")?;
             let pipeline_class = lex_learning.getattr("Pipeline")?;
             let mut builder = pipeline_class.call_method0("builder")?;
             builder = builder.call_method1("config", (&py_config,))?;
 
             // Pass progress callback if provided
+            let mut py_callback: Option<Bound<'_, PyAny>> = None;
             if let Some(ref callback) = self.progress_callback {
-                use crate::python::callback::PyProgressCallback;
-                let py_callback = Bound::new(py, PyProgressCallback::new(callback.clone()))?;
-                builder = builder.call_method1("on_progress", (py_callback,))?;
+                py_callback =
+                    Some(Bound::new(py, PyProgressCallback::new(callback.clone()))?.into_any());
+            }
+
+            let mut py_cancellation_check: Option<Bound<'_, PyAny>> = None;
+            if let Some(ref token) = self.cancellation_token {
+                let check_fn = token.as_check_fn();
+                let py_check = PyCancellationChecker::new(check_fn);
+                py_cancellation_check = Some(Bound::new(py, py_check)?.into_any());
+            }
+
+            if py_callback.is_some() || py_cancellation_check.is_some() {
+                let args = PyTuple::new(py, [py_callback.clone(), py_cancellation_check.clone()])?;
+
+                builder = builder.call_method1("on_progress", args)?;
             }
 
             let py_pipeline = builder.call_method0("build")?;
@@ -285,6 +306,7 @@ impl Pipeline {
 /// # Optional Configuration
 ///
 /// - [`on_progress()`](Self::on_progress): Progress callback for monitoring
+/// - [`cancellation_token()`](Self::cancellation_token): Token for cancellation
 ///
 /// # Example
 ///
@@ -292,12 +314,14 @@ impl Pipeline {
 /// let pipeline = Pipeline::builder()
 ///     .config(config)
 ///     .on_progress(|update| println!("{}", update.message))
+///     .cancellation_token(token)
 ///     .build()?;
 /// ```
 #[derive(Default)]
 pub struct PipelineBuilder {
     config: Option<PipelineConfig>,
     progress_callback: Option<ProgressCallback>,
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl std::fmt::Debug for PipelineBuilder {
@@ -307,6 +331,10 @@ impl std::fmt::Debug for PipelineBuilder {
             .field(
                 "progress_callback",
                 &self.progress_callback.as_ref().map(|_| "<callback>"),
+            )
+            .field(
+                "cancellation_token",
+                &self.cancellation_token.as_ref().map(|_| "<token>"),
             )
             .finish()
     }
@@ -365,6 +393,37 @@ impl PipelineBuilder {
         self
     }
 
+    /// Set the cancellation token (optional).
+    ///
+    /// When a cancellation token is provided, the training pipeline will
+    /// periodically check if cancellation has been requested and stop
+    /// processing if so.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use lex_learning::CancellationToken;
+    ///
+    /// let token = CancellationToken::new();
+    /// let pipeline = Pipeline::builder()
+    ///     .config(config)
+    ///     .cancellation_token(token)
+    ///     .build()?;
+    ///
+    /// // Later, from another thread or UI event:
+    /// // token.cancel();
+    /// ```
+    ///
+    /// # See Also
+    ///
+    /// - [`CancellationToken::cancel()`] to signal cancellation
+    /// - [`CancellationToken::is_cancelled()`] to check cancellation status
+    #[must_use]
+    pub fn cancellation_token(mut self, token: CancellationToken) -> Self {
+        self.cancellation_token = Some(token);
+        self
+    }
+
     /// Build the pipeline.
     ///
     /// # Errors
@@ -379,6 +438,7 @@ impl PipelineBuilder {
         Ok(Pipeline {
             config,
             progress_callback: self.progress_callback,
+            cancellation_token: self.cancellation_token,
             last_py_result: None,
         })
     }

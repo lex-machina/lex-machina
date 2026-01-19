@@ -39,6 +39,8 @@ export interface SettingsState {
     aiProviderType: AIProviderType;
     /** List of providers that have saved API keys in the keychain */
     savedProviders: AIProviderType[];
+    /** Whether to auto-start the ML kernel */
+    autoStartMLKernel: boolean;
     /** Whether settings are being loaded */
     isLoading: boolean;
     /** Validation status for the current API key */
@@ -62,6 +64,11 @@ export interface SettingsActions {
      * ```
      */
     setTheme: (theme: Theme) => Promise<void>;
+
+    /**
+     * Sets whether the ML kernel auto-starts on app launch.
+     */
+    setAutoStartMLKernel: (enabled: boolean) => Promise<void>;
 
     /**
      * Configures an AI provider.
@@ -221,6 +228,7 @@ export function useSettings(): UseSettingsReturn {
     const [theme, setThemeState] = useState<Theme>("system");
     const [aiConfig, setAIConfig] = useState<AIProviderConfig | null>(null);
     const [savedProviders, setSavedProviders] = useState<AIProviderType[]>([]);
+    const [autoStartMLKernel, setAutoStartMLKernelState] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [validationStatus, setValidationStatus] =
         useState<ValidationStatus>("idle");
@@ -240,16 +248,22 @@ export function useSettings(): UseSettingsReturn {
     const fetchSettings = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [fetchedTheme, fetchedAIConfig, fetchedSavedProviders] =
-                await Promise.all([
-                    invoke<Theme>("get_theme"),
-                    invoke<AIProviderConfig | null>("get_ai_provider_config"),
-                    invoke<AIProviderType[]>("get_saved_providers"),
-                ]);
+            const [
+                fetchedTheme,
+                fetchedAIConfig,
+                fetchedSavedProviders,
+                fetchedAutoStartMLKernel,
+            ] = await Promise.all([
+                invoke<Theme>("get_theme"),
+                invoke<AIProviderConfig | null>("get_ai_provider_config"),
+                invoke<AIProviderType[]>("get_saved_providers"),
+                invoke<boolean>("get_auto_start_ml_kernel"),
+            ]);
 
             setThemeState(fetchedTheme);
             setAIConfig(fetchedAIConfig);
             setSavedProviders(fetchedSavedProviders);
+            setAutoStartMLKernelState(fetchedAutoStartMLKernel);
         } catch (err) {
             console.error("Failed to fetch settings:", err);
         } finally {
@@ -270,6 +284,19 @@ export function useSettings(): UseSettingsReturn {
             // State will be updated via event
         } catch (err) {
             console.error("Failed to set theme:", err);
+            throw err;
+        }
+    }, []);
+
+    /**
+     * Sets whether the ML kernel auto-starts.
+     */
+    const setAutoStartMLKernel = useCallback(async (enabled: boolean) => {
+        try {
+            await invoke("set_auto_start_ml_kernel", { autoStart: enabled });
+            setAutoStartMLKernelState(enabled);
+        } catch (err) {
+            console.error("Failed to set ML auto-start:", err);
             throw err;
         }
     }, []);
@@ -439,12 +466,14 @@ export function useSettings(): UseSettingsReturn {
         hasAIProvider,
         aiProviderType,
         savedProviders,
+        autoStartMLKernel,
         isLoading,
         validationStatus,
         validationError,
 
         // Actions
         setTheme,
+        setAutoStartMLKernel,
         configureAIProvider,
         clearAIProvider,
         switchProvider,

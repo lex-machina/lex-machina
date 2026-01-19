@@ -36,7 +36,7 @@
 //!   to fetch the actual data
 
 use lex_processing::{PreprocessingSummary, ProgressUpdate};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use crate::state::{FileInfo, Theme};
@@ -91,6 +91,30 @@ pub const EVENT_PREPROCESSING_CANCELLED: &str = "preprocessing:cancelled";
 pub const EVENT_THEME_CHANGED: &str = "settings:theme-changed";
 
 // ============================================================================
+// ML EVENT CONSTANTS
+// ============================================================================
+
+/// Event emitted during ML training to report progress.
+/// Payload: `MLProgressPayload` with stage, progress, message, model info
+pub const EVENT_ML_PROGRESS: &str = "ml:progress";
+
+/// Event emitted when ML training completes successfully.
+/// Payload: `MLCompletePayload` with best model name and metrics
+pub const EVENT_ML_COMPLETE: &str = "ml:complete";
+
+/// Event emitted when ML training fails with an error.
+/// Payload: `MLErrorPayload` with error code and message
+pub const EVENT_ML_ERROR: &str = "ml:error";
+
+/// Event emitted when ML training is cancelled by the user.
+/// Payload: Empty (unit type serializes to `null`)
+pub const EVENT_ML_CANCELLED: &str = "ml:cancelled";
+
+/// Event emitted when ML kernel (Python runtime) status changes.
+/// Payload: `MLKernelStatusPayload` with status and optional message
+pub const EVENT_ML_KERNEL_STATUS: &str = "ml:kernel-status";
+
+// ============================================================================
 // EVENT PAYLOADS
 // ============================================================================
 
@@ -142,6 +166,76 @@ pub struct PreprocessingErrorPayload {
     pub code: String,
     /// Human-readable error message for display
     pub message: String,
+}
+
+// ============================================================================
+// ML EVENT PAYLOADS
+// ============================================================================
+
+/// Payload for the `ml:progress` event.
+///
+/// Contains progress information during ML training.
+#[derive(Debug, Clone, Serialize)]
+pub struct MLProgressPayload {
+    /// Current training stage (e.g., "initializing", "training", "evaluation")
+    pub stage: String,
+    /// Overall progress from 0.0 to 1.0
+    pub progress: f64,
+    /// Human-readable status message
+    pub message: String,
+    /// Name of the model currently being trained (if in training stage)
+    pub current_model: Option<String>,
+    /// Tuple of (completed, total) models trained
+    pub models_completed: Option<(u32, u32)>,
+}
+
+/// Payload for the `ml:complete` event.
+///
+/// Contains summary information about a successful training run.
+#[derive(Debug, Clone, Serialize)]
+pub struct MLCompletePayload {
+    /// Name of the best performing model
+    pub best_model_name: String,
+    /// Test set score (accuracy for classification, R2 for regression)
+    pub test_score: f64,
+    /// Total training time in seconds
+    pub training_time_seconds: f64,
+}
+
+/// Payload for the `ml:error` event.
+///
+/// Contains structured error information specific to ML training failures.
+#[derive(Debug, Clone, Serialize)]
+pub struct MLErrorPayload {
+    /// Error code for programmatic handling
+    pub code: String,
+    /// Human-readable error message for display
+    pub message: String,
+}
+
+/// Payload for the `ml:kernel-status` event.
+///
+/// Contains status information about the Python ML runtime kernel.
+#[derive(Debug, Clone, Serialize)]
+pub struct MLKernelStatusPayload {
+    /// Current kernel status
+    pub status: MLKernelStatus,
+    /// Optional message (e.g., error details, initialization progress)
+    pub message: Option<String>,
+}
+
+/// Kernel status values for ML runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MLKernelStatus {
+    /// Kernel has not been initialized yet
+    Uninitialized,
+    /// Kernel is currently initializing
+    Initializing,
+    /// Kernel is ready for training
+    Ready,
+    /// Kernel encountered an error
+    Error,
 }
 
 // ============================================================================
@@ -215,6 +309,35 @@ pub trait AppEventEmitter {
     /// Called when the theme setting is changed. The frontend should
     /// immediately apply the new theme.
     fn emit_theme_changed(&self, theme: Theme);
+
+    // -------------------------------------------------------------------------
+    // ML Events
+    // -------------------------------------------------------------------------
+
+    /// Emit the `ml:progress` event with progress update.
+    ///
+    /// Called during training to update the progress UI.
+    fn emit_ml_progress(&self, update: &MLProgressPayload);
+
+    /// Emit the `ml:complete` event with completion summary.
+    ///
+    /// Called when training finishes successfully.
+    fn emit_ml_complete(&self, payload: &MLCompletePayload);
+
+    /// Emit the `ml:error` event with error details.
+    ///
+    /// Called when training fails.
+    fn emit_ml_error(&self, code: &str, message: &str);
+
+    /// Emit the `ml:cancelled` event.
+    ///
+    /// Called when the user cancels training.
+    fn emit_ml_cancelled(&self);
+
+    /// Emit the `ml:kernel-status` event with kernel status.
+    ///
+    /// Called when the Python ML runtime status changes.
+    fn emit_ml_kernel_status(&self, status: MLKernelStatus, message: Option<&str>);
 }
 
 impl AppEventEmitter for AppHandle {
@@ -293,6 +416,48 @@ impl AppEventEmitter for AppHandle {
             eprintln!("Failed to emit settings:theme-changed event: {}", e);
         }
     }
+
+    // -------------------------------------------------------------------------
+    // ML Events Implementation
+    // -------------------------------------------------------------------------
+
+    fn emit_ml_progress(&self, update: &MLProgressPayload) {
+        if let Err(e) = self.emit(EVENT_ML_PROGRESS, update) {
+            eprintln!("Failed to emit ml:progress event: {}", e);
+        }
+    }
+
+    fn emit_ml_complete(&self, payload: &MLCompletePayload) {
+        if let Err(e) = self.emit(EVENT_ML_COMPLETE, payload) {
+            eprintln!("Failed to emit ml:complete event: {}", e);
+        }
+    }
+
+    fn emit_ml_error(&self, code: &str, message: &str) {
+        let payload = MLErrorPayload {
+            code: code.to_string(),
+            message: message.to_string(),
+        };
+        if let Err(e) = self.emit(EVENT_ML_ERROR, payload) {
+            eprintln!("Failed to emit ml:error event: {}", e);
+        }
+    }
+
+    fn emit_ml_cancelled(&self) {
+        if let Err(e) = self.emit(EVENT_ML_CANCELLED, ()) {
+            eprintln!("Failed to emit ml:cancelled event: {}", e);
+        }
+    }
+
+    fn emit_ml_kernel_status(&self, status: MLKernelStatus, message: Option<&str>) {
+        let payload = MLKernelStatusPayload {
+            status,
+            message: message.map(String::from),
+        };
+        if let Err(e) = self.emit(EVENT_ML_KERNEL_STATUS, payload) {
+            eprintln!("Failed to emit ml:kernel-status event: {}", e);
+        }
+    }
 }
 
 // ============================================================================
@@ -357,4 +522,35 @@ pub mod error_codes {
 
     /// API key validation failed
     pub const SETTINGS_INVALID_API_KEY: &str = "INVALID_API_KEY";
+
+    // -------------------------------------------------------------------------
+    // ML Error Codes
+    // -------------------------------------------------------------------------
+
+    /// ML runtime is not initialized
+    pub const ML_NOT_INITIALIZED: &str = "ML_NOT_INITIALIZED";
+
+    /// No DataFrame is loaded for training
+    pub const ML_NO_DATA: &str = "ML_NO_DATA";
+
+    /// Training is already in progress
+    pub const ML_TRAINING_IN_PROGRESS: &str = "ML_TRAINING_IN_PROGRESS";
+
+    /// No trained model available
+    pub const ML_NO_MODEL: &str = "ML_NO_MODEL";
+
+    /// Invalid ML configuration
+    pub const ML_INVALID_CONFIG: &str = "ML_INVALID_CONFIG";
+
+    /// All models failed to train
+    pub const ML_TRAINING_FAILED: &str = "ML_TRAINING_FAILED";
+
+    /// Training was cancelled by user
+    pub const ML_CANCELLED: &str = "ML_CANCELLED";
+
+    /// Prediction/inference failed
+    pub const ML_INFERENCE_ERROR: &str = "ML_INFERENCE_ERROR";
+
+    /// Python runtime initialization failed
+    pub const ML_RUNTIME_INIT_FAILED: &str = "ML_RUNTIME_INIT_FAILED";
 }

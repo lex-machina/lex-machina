@@ -4,3 +4,8 @@
 #     "-C", "link-arg=-fuse-ld=/usr/bin/mold",    # Force use of Mold linker
 #     "-Z", "threads=4"                           # Enable parallel compilation in the compiler frontend (Nightly only)
 # ]
+
+[env]
+PYO3_PYTHON = { value = "crates/lex-learning/runtime/python/linux-x86_64/bin/python3.12", relative = true }
+PYTHONHOME = { value = "crates/lex-learning/runtime/python/linux-x86_64", relative = true }
+LD_LIBRARY_PATH = { value = "crates/lex-learning/runtime/python/linux-x86_64/lib", relative = true }

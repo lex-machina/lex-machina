@@ -32,6 +32,9 @@ thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+# Compile-time assertions for trait bounds (Send + Sync)
+static_assertions = "1"
+
 [build-dependencies]
 # No build dependencies required - build.rs uses only std
 

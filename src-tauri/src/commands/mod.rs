@@ -10,6 +10,7 @@
 //! - **dataframe**: Data Operations (row fetching for virtual scroll, closing files)
 //! - **ui**: UI state management (sidebar width, column widths)
 //! - **preprocessing**: Data preprocessing pipeline operations
+//! - **ml**: Machine learning commands (training, prediction, model I/O)
 //! - **settings**: App settings (theme, AI provider configuration)
 //! - **keyring**: Secure credential storage (OS keychain for API keys)
 //!
@@ -28,6 +29,7 @@ pub mod dataframe;
 pub mod dialog;
 pub mod file_io;
 pub mod keyring;
+pub mod ml;
 pub mod preprocessing;
 pub mod settings;
 pub mod ui;
@@ -37,6 +39,7 @@ pub use dataframe::*;
 pub use dialog::*;
 pub use file_io::*;
 pub use keyring::*;
+pub use ml::*;
 pub use preprocessing::*;
 pub use settings::*;
 pub use ui::*;

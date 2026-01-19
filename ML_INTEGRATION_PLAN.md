@@ -68,21 +68,88 @@ CSV File ──► load_file() ──► dataframe
 
 ---
 
+## Automatic vs Manual Mode Paradigm
+
+Following the Lex Machina vision to empower non-technical users with the power of data science, **Lex Learning operates in two modes** - exactly like Lex Processing:
+
+### Smart Mode (Automatic) - Default
+
+**One-click training:** User selects target column and clicks "Train Model"
+
+**AI handles all decisions automatically:**
+
+- Auto-detects best algorithms based on data characteristics
+- Optimizes hyperparameters via Optuna (with smart defaults)
+- Selects optimal train/test split ratio
+- Enables explainability automatically (SHAP plots)
+- Handles feature selection automatically (all features by default)
+- Chooses optimal CV fold count based on dataset size
+
+**User experience:**
+
+- All manual settings are visible but grayed out (non-editable)
+- See what would be configured, but don't need to understand it
+- Fast path from data to trained model
+
+### Manual Mode - Full Control
+
+**User configures every detail:**
+
+- Select specific algorithm (or let it auto-select)
+- Configure hyperparameter optimization (on/off, trials, CV folds)
+- Set train/test split ratio
+- Toggle neural networks
+- Toggle explainability
+- Select top_k algorithms to compare
+- Exclude specific features
+- Configure Optuna n_trials
+
+**User experience:**
+
+- Full control over all ML pipeline parameters
+- Can override automatic decisions
+- For advanced users who want fine-grained control
+
+### Mode Toggle
+
+A Smart/Manual tab (like preprocessing page) switches between modes:
+
+- **Default:** Smart mode (empower non-technical users)
+- User can switch to Manual mode anytime
+- Mode preference persists across sessions
+
+### Backend Behavior
+
+When `smart_mode = true`:
+
+- Frontend sends `smart_mode: true` flag
+- Backend uses default optimal values for all config
+- Backend may still use intelligent defaults from lex-learning
+
+When `smart_mode = false`:
+
+- Frontend sends user-specified values
+- Backend uses user's exact configuration
+
+---
+
 ## Design Decisions
 
-| Decision                 | Choice                                | Rationale                            |
-| ------------------------ | ------------------------------------- | ------------------------------------ |
-| **Cancellation**         | Support via shared AtomicBool         | User can abort long training runs    |
-| **Kernel init**          | Manual "Start Kernel" button          | User controls when 2-3s init happens |
-| **Auto-start option**    | Settings toggle (default: off)        | Power users can auto-start           |
-| **Layout**               | Sidebar + Content                     | Consistent with preprocessing page   |
-| **SHAP plots**           | Full resolution, inline               | Best quality for analysis            |
-| **Model files**          | .pkl extension                        | Native to Python/sklearn             |
-| **Prediction input**     | Form + JSON toggle                    | Accessible + powerful                |
-| **Training history**     | Keep history (like preprocessing)     | Compare different runs               |
-| **Data source**          | User chooses (processed or original)  | Flexibility                          |
-| **Feature selection**    | All selected by default, can deselect | Simple default, full control         |
-| **Implementation order** | lex-learning → Backend → Frontend     | Core library first                   |
+| Decision                 | Choice                                | Rationale                                                       |
+| ------------------------ | ------------------------------------- | --------------------------------------------------------------- |
+| **Mode paradigm**        | Smart (auto) + Manual (full control)  | Empower non-technical users, match preprocessing                |
+| **Default mode**         | Smart mode                            | One-click training for non-experts                              |
+| **Cancellation**         | Support via shared AtomicBool         | User can abort long training runs                               |
+| **Kernel init**          | Manual "Start Kernel" button          | User controls when 2-3s init happens                            |
+| **Auto-start option**    | Settings toggle (default: off)        | Power users can auto-start at app startup                       |
+| **Layout**               | Sidebar + Content                     | Consistent with preprocessing page                              |
+| **SHAP plots**           | Base64-encoded inline images          | Binary data over JSON/IPC, `<img>` compatible                   |
+| **Model files**          | User-selected path via file dialog    | Native file dialog, no hardcoded .pkl path                      |
+| **Prediction input**     | Form + JSON toggle                    | Accessible + powerful                                           |
+| **Training history**     | Keep history (like preprocessing)     | Compare different runs                                          |
+| **Data source**          | User chooses (processed or original)  | Flexibility                                                     |
+| **Feature selection**    | All selected by default, can deselect | Simple default, full control - exclusion handled in Tauri layer |
+| **Implementation order** | lex-learning → Backend → Frontend     | Core library first                                              |
 
 ---
 
@@ -92,6 +159,17 @@ CSV File ──► load_file() ──► dataframe
 
 **Goal:** Add cancellation support to the lex-learning crate.
 
+**Note:** The Python side already has the cancellation infrastructure:
+
+- `ProgressReporter.is_cancelled()` method exists
+- `CallbackProgressReporter` accepts `cancellation_check` callback
+- Training code checks `reporter.is_cancelled()` and raises `CancelledError`
+
+We only need to:
+
+1. Create `CancellationToken` in Rust
+2. Bridge it to Python via the existing callback mechanism
+
 #### New Files
 
 | File                  | Purpose                                    |
@@ -100,18 +178,22 @@ CSV File ──► load_file() ──► dataframe
 
 #### Modified Files
 
-| File                         | Changes                                |
-| ---------------------------- | -------------------------------------- |
-| `src/lib.rs`                 | Export `CancellationToken`             |
-| `src/pipeline.rs`            | Add `.cancellation_token()` to builder |
-| `src/python/callback.rs`     | Add `PyCancellationChecker` pyclass    |
-| `python/.../orchestrator.py` | Check cancellation in training loop    |
+| File              | Changes                                |
+| ----------------- | -------------------------------------- |
+| `src/lib.rs`      | Export `CancellationToken`             |
+| `src/pipeline.rs` | Add `.cancellation_token()` to builder |
+
+**Python Integration (already exists - no changes needed):**
+
+- `python/.../progress/reporter.py` - `CallbackProgressReporter` already accepts `cancellation_check`
+- `python/.../training/trainer.py` - Already calls `reporter.is_cancelled()` and raises `CancelledError`
+- `python/.../training/optimizer.py` - Already checks `reporter.is_cancelled()` in objective function
 
 #### CancellationToken API
 
 ```rust
 pub struct CancellationToken {
-    flag: Arc<AtomicBool>,
+    cancelled: Arc<AtomicBool>,
 }
 
 impl CancellationToken {
@@ -119,9 +201,11 @@ impl CancellationToken {
     pub fn cancel(&self);
     pub fn is_cancelled(&self) -> bool;
     pub fn reset(&self);
-    pub fn clone_flag(&self) -> Arc<AtomicBool>;  // For Python bridge
+    pub fn as_check_fn(&self) -> impl Fn() -> bool + Send + Sync + 'static;
 }
 ```
+
+**Python Bridge:** Use `as_check_fn()` to pass a closure into Python's `CallbackProgressReporter` as the `cancellation_check` callable.
 
 #### Pipeline Builder Addition
 
@@ -131,24 +215,11 @@ impl PipelineBuilder {
 }
 ```
 
-#### Python Integration
+**How cancellation is passed to Python:**
 
-```python
-# In orchestrator.py
-class Pipeline:
-    def __init__(self, ..., cancel_check: Optional[Callable[[], bool]] = None):
-        self._cancel_check = cancel_check
-
-    def _check_cancelled(self) -> bool:
-        if self._cancel_check:
-            return self._cancel_check()
-        return False
-
-    def train(self, df):
-        # At key checkpoints:
-        if self._check_cancelled():
-            raise TrainingCancelled("Training cancelled by user")
-```
+1. Rust creates `CancellationToken`
+2. In the training command, use `token.as_check_fn()` for the cancellation check
+3. Pass closure to `CallbackProgressReporter` via `PyProgressCallback::with_cancellation_check()`
 
 ---
 
@@ -168,9 +239,10 @@ pub ml_ui_state: RwLock<MLUIState>,
 
 // New types
 pub struct MLUIState {
+    pub smart_mode: bool,  // true = automatic, false = manual
     pub target_column: Option<String>,
     pub problem_type: String,
-    pub excluded_columns: Vec<String>,
+    pub excluded_columns: Vec<String>,  // Handled in Tauri layer (filter before lex-learning)
     pub use_processed_data: bool,
     pub config: MLConfigUIState,
     pub active_tab: String,
@@ -196,7 +268,7 @@ pub struct TrainingHistoryEntry {
 pub struct MLConfigSnapshot {
     pub target_column: String,
     pub problem_type: String,
-    pub excluded_columns: Vec<String>,
+    pub excluded_columns: Vec<String>,  // Handled in Tauri layer
     pub use_processed_data: bool,
     pub optimize_hyperparams: bool,
     pub n_trials: u32,
@@ -248,8 +320,17 @@ pub struct MLErrorPayload {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MLKernelStatusPayload {
-    pub status: String,  // "uninitialized", "initializing", "ready", "error"
+    pub status: MLKernelStatus,
     pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MLKernelStatus {
+    Uninitialized,
+    Initializing,
+    Ready,
+    Error,
 }
 
 // Error codes
@@ -263,6 +344,7 @@ pub mod error_codes {
     pub const ML_TRAINING_FAILED: &str = "ML_TRAINING_FAILED";
     pub const ML_CANCELLED: &str = "ML_CANCELLED";
     pub const ML_INFERENCE_ERROR: &str = "ML_INFERENCE_ERROR";
+    pub const ML_RUNTIME_INIT_FAILED: &str = "ML_RUNTIME_INIT_FAILED";
 }
 
 // Trait extension
@@ -287,9 +369,10 @@ pub trait AppEventEmitter {
 // Request types
 #[derive(Debug, Clone, Deserialize)]
 pub struct MLConfigRequest {
+    pub smart_mode: bool,  // true = automatic, false = manual
     pub target_column: String,
     pub problem_type: String,
-    pub excluded_columns: Vec<String>,
+    pub excluded_columns: Vec<String>,  // Handled in Tauri layer (filter before lex-learning)
     pub use_processed_data: bool,
     pub optimize_hyperparams: Option<bool>,
     pub n_trials: Option<u32>,
@@ -308,7 +391,7 @@ pub struct TrainingResultResponse {
     pub best_model_name: String,
     pub metrics: lex_learning::Metrics,
     pub feature_importance: Vec<(String, f64)>,
-    pub shap_plot_names: Vec<String>,
+    pub shap_plots: HashMap<String, String>,  // plot_name -> base64-encoded PNG
     pub model_comparison: Vec<lex_learning::ModelComparison>,
     pub training_time_seconds: f64,
     pub warnings: Vec<String>,
@@ -380,9 +463,10 @@ pub struct BatchPredictionResult {
 ```typescript
 // ML Configuration
 export interface MLConfigRequest {
+    smart_mode: boolean; // true = automatic, false = manual
     target_column: string;
     problem_type: "classification" | "regression";
-    excluded_columns: string[];
+    excluded_columns: string[]; // Handled in Tauri layer (filter before lex-learning)
     use_processed_data: boolean;
     optimize_hyperparams?: boolean;
     n_trials?: number;
@@ -394,13 +478,13 @@ export interface MLConfigRequest {
     algorithm?: string;
 }
 
-// Training Result (without SHAP plot bytes)
+// Training Result (SHAP plots are base64-encoded PNG bytes)
 export interface TrainingResultResponse {
     success: boolean;
     best_model_name: string;
     metrics: Metrics;
     feature_importance: [string, number][];
-    shap_plot_names: string[];
+    shap_plots: Record<string, string>; // plot_name -> base64-encoded PNG
     model_comparison: ModelComparison[];
     training_time_seconds: number;
     warnings: string[];
@@ -448,7 +532,7 @@ export interface ModelInfo {
     problem_type: string;
     target_column: string;
     feature_names: string[];
-    class_labels?: string[];
+    class_labels?: string[]; // Populated for classification problems
     metrics: Metrics;
     hyperparameters: Record<string, unknown>;
 }
@@ -479,9 +563,10 @@ export type MLTrainingStatus =
 
 // UI State
 export interface MLUIState {
+    smart_mode: boolean; // true = automatic, false = manual
     target_column?: string;
     problem_type: string;
-    excluded_columns: string[];
+    excluded_columns: string[]; // Handled in Tauri layer
     use_processed_data: boolean;
     config: MLConfigUIState;
     active_tab: string;
@@ -508,7 +593,7 @@ export interface TrainingHistoryEntry {
 export interface MLConfigSnapshot {
     target_column: string;
     problem_type: string;
-    excluded_columns: string[];
+    excluded_columns: string[]; // Handled in Tauri layer
     use_processed_data: boolean;
     optimize_hyperparams: boolean;
     n_trials: number;
@@ -548,7 +633,7 @@ export function useML() {
   const cancelTraining = async () => { ... };
   const saveModel = async () => { ... };
   const loadModel = async () => { ... };
-  const getSHAPPlot = async (name: string): Promise<string> => { ... };
+  const getSHAPPlot = async (name: string): Promise<string> => { ... };  // Returns base64 PNG
   const predictSingle = async (instance: Record<string, unknown>) => { ... };
   const predictBatch = async () => { ... };
   const clearHistory = async () => { ... };
@@ -590,11 +675,12 @@ export function useML() {
 components/ml/
 ├── ml-sidebar.tsx              # Full sidebar content
 │   ├── KernelStatusCard        # Status + "Start Kernel" button
+│   ├── ModeToggle              # Smart/Manual mode selector (like preprocessing)
 │   ├── DataSourceSelector      # Processed vs Original toggle
 │   ├── TargetColumnSelector    # Dropdown
 │   ├── ProblemTypeSelector     # Classification/Regression
 │   ├── FeatureSelector         # Checkbox list
-│   ├── AdvancedConfig          # Collapsible config options
+│   ├── AdvancedConfig          # Collapsible config options (grayed out in Smart mode)
 │   └── ActionButtons           # Train/Cancel/Save/Load
 │
 ├── ml-content.tsx              # Main content area
@@ -626,6 +712,9 @@ components/ml/
 ├─────────────────────────────────────────────────────────┬─────────────────────┤
 │                                                         │ Kernel: ● Ready     │
 │                                                         ├─────────────────────┤
+│                                                         │ Mode                │
+│                                                         │ ● Smart ○ Manual    │
+│                                                         ├─────────────────────┤
 │                                                         │ Data Source         │
 │                                                         │ ○ Processed ● Orig  │
 │                                                         ├─────────────────────┤
@@ -639,6 +728,7 @@ components/ml/
 │                                                         │ ▸ Features (12/14)  │
 │                                                         ├─────────────────────┤
 │                                                         │ ▸ Advanced Config   │
+│                                                         │   (grayed in Smart) │
 │                                                         ├─────────────────────┤
 │                                                         │ [Train Model]       │
 │                                                         │ [Save] [Load]       │
@@ -651,13 +741,12 @@ components/ml/
 
 ### Phase 5: Settings Integration
 
-Add to Settings page:
+Add to Settings page (or new "Machine Learning" section):
 
 ```typescript
-// In settings page or new "Machine Learning" section
 <SettingRow
   title="Auto-start ML Kernel"
-  description="Automatically initialize the Python runtime when visiting the ML page"
+  description="Automatically initialize the Python ML runtime when the app starts. If disabled, you'll need to click 'Start Kernel' on the ML page."
 >
   <Switch
     checked={autoStartKernel}
@@ -665,6 +754,11 @@ Add to Settings page:
   />
 </SettingRow>
 ```
+
+**Behavior:**
+
+- **Default (off):** User clicks "Start Kernel" button on ML page, 2-3s initialization, UI unlocks
+- **On:** App initializes kernel on startup (background), ML page ready immediately
 
 ---
 
@@ -693,33 +787,52 @@ Add to Settings page:
 
 ### Modified Files
 
-| File                                             | Changes                     |
-| ------------------------------------------------ | --------------------------- |
-| `crates/lex-learning/src/lib.rs`                 | Export CancellationToken    |
-| `crates/lex-learning/src/pipeline.rs`            | Add cancellation to builder |
-| `crates/lex-learning/python/.../orchestrator.py` | Check cancellation          |
-| `src-tauri/src/state.rs`                         | Add ML state fields         |
-| `src-tauri/src/events.rs`                        | Add ML events               |
-| `src-tauri/src/commands/mod.rs`                  | Export ml module            |
-| `src-tauri/src/lib.rs`                           | Register ML commands        |
-| `types/index.ts`                                 | Add ML types                |
-| `app/ml/page.tsx`                                | Replace placeholder         |
-| `app/settings/page.tsx`                          | Add auto-start toggle       |
+| File                                      | Changes                     |
+| ----------------------------------------- | --------------------------- |
+| `crates/lex-learning/src/lib.rs`          | Export CancellationToken    |
+| `crates/lex-learning/src/pipeline.rs`     | Add cancellation to builder |
+| `crates/lex-learning/src/cancellation.rs` | New CancellationToken type  |
+| `src-tauri/src/state.rs`                  | Add ML state fields         |
+| `src-tauri/src/events.rs`                 | Add ML events               |
+| `src-tauri/src/commands/mod.rs`           | Export ml module            |
+| `src-tauri/src/lib.rs`                    | Register ML commands        |
+| `types/index.ts`                          | Add ML types (base64 SHAP)  |
+| `app/ml/page.tsx`                         | Replace placeholder         |
+| `app/settings/page.tsx`                   | Add auto-start toggle       |
+
+### Removed Files
+
+| File                                           | Reason                                       |
+| ---------------------------------------------- | -------------------------------------------- |
+| `crates/lex-learning/src/python/callback.rs`   | Keep PyCancellationChecker, make it callable |
+| `python/.../orchestrator.py` cancellation mods | Python already has cancellation              |
 
 ---
 
 ## Estimated Effort
 
-| Phase                      | Estimated Time  |
-| -------------------------- | --------------- |
-| Phase 0: lex-learning mods | 2-3 hours       |
-| Phase 1: State & Events    | 1-2 hours       |
-| Phase 2: Commands          | 3-4 hours       |
-| Phase 3: Types & Hook      | 1-2 hours       |
-| Phase 4: Components        | 4-6 hours       |
-| Phase 5: Settings          | 0.5 hours       |
-| Phase 6: Testing           | 2-3 hours       |
-| **Total**                  | **14-20 hours** |
+| Phase                      | Estimated Time  | Notes                                 |
+| -------------------------- | --------------- | ------------------------------------- |
+| Phase 0: lex-learning mods | 1-2 hours       | Python already has cancellation infra |
+| Phase 1: State & Events    | 1-2 hours       |                                       |
+| Phase 2: Commands          | 3-4 hours       | 17 commands + SHAP base64 encoding    |
+| Phase 3: Types & Hook      | 2-3 hours       | Type corrections + SHAP base64        |
+| Phase 4: Components        | 4-6 hours       |                                       |
+| Phase 5: Settings          | 1 hour          | Auto-start toggle + persistence       |
+| Phase 6: Testing           | 2-3 hours       |                                       |
+| **Total**                  | **14-18 hours** |                                       |
+
+---
+
+## Implementation Corrections (January 18, 2026)
+
+| Item                | Original Plan                         | Corrected Plan                                                      |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------- |
+| Feature exclusion   | Add to `lex_learning::PipelineConfig` | Handle in Tauri command (filter columns before training)            |
+| SHAP plots IPC      | `shap_plot_names: string[]`           | `shap_plots: Record<string, string>` (base64-encoded PNG)           |
+| Python cancellation | Keep `PyCancellationChecker` callable | Python already has infrastructure - bridge Rust token with callable |
+| Model storage       | `.pkl` extension                      | User-selected path via native file dialog                           |
+| Auto-start setting  | Implied                               | Explicit toggle in Settings page                                    |
 
 ---
 
@@ -734,4 +847,5 @@ Add to Settings page:
 ---
 
 _Created: January 18, 2026_
+_Last Updated: January 18, 2026 - Added Automatic vs Manual Mode Paradigm, Phase 0 simplifications, base64 SHAP plots, user-selected model storage_
 _Status: Approved - Ready for Implementation_

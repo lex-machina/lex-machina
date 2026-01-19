@@ -49,6 +49,13 @@ export const RUST_EVENTS = {
 
     // Settings events
     THEME_CHANGED: "settings:theme-changed",
+
+    // ML events
+    ML_PROGRESS: "ml:progress",
+    ML_COMPLETE: "ml:complete",
+    ML_ERROR: "ml:error",
+    ML_CANCELLED: "ml:cancelled",
+    ML_KERNEL_STATUS: "ml:kernel-status",
 } as const;
 
 export type RustEventName = (typeof RUST_EVENTS)[keyof typeof RUST_EVENTS];
@@ -112,6 +119,17 @@ export const ERROR_CODES = {
     // Settings error codes
     SETTINGS_INVALID_PROVIDER: "INVALID_PROVIDER",
     SETTINGS_INVALID_API_KEY: "INVALID_API_KEY",
+
+    // ML error codes
+    ML_NOT_INITIALIZED: "ML_NOT_INITIALIZED",
+    ML_NO_DATA: "ML_NO_DATA",
+    ML_TRAINING_IN_PROGRESS: "ML_TRAINING_IN_PROGRESS",
+    ML_NO_MODEL: "ML_NO_MODEL",
+    ML_INVALID_CONFIG: "ML_INVALID_CONFIG",
+    ML_TRAINING_FAILED: "ML_TRAINING_FAILED",
+    ML_CANCELLED: "ML_CANCELLED",
+    ML_INFERENCE_ERROR: "ML_INFERENCE_ERROR",
+    ML_RUNTIME_INIT_FAILED: "ML_RUNTIME_INIT_FAILED",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -508,6 +526,170 @@ export type PreprocessingCompletePayload = PreprocessingSummary;
  * Contains the new theme value.
  */
 export type ThemeChangedPayload = Theme;
+
+// ============================================================================
+// ML TYPES (Mirrors lex-learning + state.rs + events.rs)
+// ============================================================================
+
+export interface MLConfigRequest {
+    smart_mode: boolean;
+    target_column: string;
+    problem_type: "classification" | "regression";
+    excluded_columns: string[];
+    use_processed_data: boolean;
+    optimize_hyperparams?: boolean;
+    n_trials?: number;
+    cv_folds?: number;
+    test_size?: number;
+    enable_neural_networks?: boolean;
+    enable_explainability?: boolean;
+    top_k_algorithms?: number;
+    algorithm?: string;
+}
+
+export interface TrainingResultResponse {
+    success: boolean;
+    best_model_name: string;
+    metrics: Metrics;
+    feature_importance: [string, number][];
+    shap_plots: Record<string, string>;
+    model_comparison: ModelComparison[];
+    training_time_seconds: number;
+    warnings: string[];
+}
+
+export interface Metrics {
+    cv_score?: number;
+    test_score?: number;
+    train_score?: number;
+    accuracy?: number;
+    precision?: number;
+    recall?: number;
+    f1_score?: number;
+    roc_auc?: number;
+    mse?: number;
+    rmse?: number;
+    mae?: number;
+    r2?: number;
+}
+
+export interface ModelComparison {
+    name: string;
+    test_score: number;
+    train_score: number;
+    cv_score: number;
+    training_time_seconds: number;
+    hyperparameters: Record<string, unknown>;
+    overfitting_risk: "low" | "medium" | "high";
+}
+
+export interface PredictionResult {
+    prediction: string | number | boolean | null;
+    probabilities?: Record<string, number>;
+    confidence?: number;
+}
+
+export interface BatchPredictionResult {
+    predictions: (string | number | boolean | null)[];
+    probabilities?: Record<string, number>[];
+    row_count: number;
+}
+
+export interface ModelInfo {
+    model_name: string;
+    problem_type: string;
+    target_column: string;
+    feature_names: string[];
+    class_labels?: string[];
+    metrics: Metrics;
+    hyperparameters: Record<string, unknown>;
+}
+
+export interface MLProgressUpdate {
+    stage: string;
+    progress: number;
+    message: string;
+    current_model?: string;
+    models_completed?: [number, number];
+}
+
+export type MLKernelStatus =
+    | "uninitialized"
+    | "initializing"
+    | "ready"
+    | "error";
+
+export type MLTrainingStatus =
+    | "idle"
+    | "training"
+    | "completed"
+    | "error"
+    | "cancelled";
+
+export interface MLUIState {
+    smart_mode: boolean;
+    target_column: string | null;
+    problem_type: string;
+    excluded_columns: string[];
+    use_processed_data: boolean;
+    config: MLConfigUIState;
+    active_tab: string;
+}
+
+export interface MLConfigUIState {
+    optimize_hyperparams: boolean;
+    n_trials: number;
+    cv_folds: number;
+    test_size: number;
+    enable_neural_networks: boolean;
+    enable_explainability: boolean;
+    top_k_algorithms: number;
+    algorithm?: string;
+}
+
+export interface TrainingHistoryEntry {
+    id: string;
+    timestamp: number;
+    config: MLConfigSnapshot;
+    result_summary: TrainingResultSummary;
+}
+
+export interface MLConfigSnapshot {
+    target_column: string;
+    problem_type: string;
+    excluded_columns: string[];
+    use_processed_data: boolean;
+    optimize_hyperparams: boolean;
+    n_trials: number;
+    cv_folds: number;
+    enable_explainability: boolean;
+    top_k_algorithms: number;
+    algorithm?: string;
+}
+
+export interface TrainingResultSummary {
+    best_model_name: string;
+    test_score: number;
+    training_time_seconds: number;
+}
+
+export interface MLCompletePayload {
+    best_model_name: string;
+    test_score: number;
+    training_time_seconds: number;
+}
+
+export interface MLErrorPayload {
+    code: string;
+    message: string;
+}
+
+export interface MLKernelStatusPayload {
+    status: MLKernelStatus;
+    message?: string | null;
+}
+
+export type MLProgressPayload = MLProgressUpdate;
 
 // ============================================================================
 // PREPROCESSING UI STATE (for navigation persistence)

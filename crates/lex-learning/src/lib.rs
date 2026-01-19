@@ -126,6 +126,7 @@
 //!
 //! - [`python`] - Python runtime management and interop utilities
 
+mod cancellation;
 mod config;
 mod error;
 mod model;
@@ -138,6 +139,8 @@ mod types;
 //
 // Configuration types
 pub use config::{PipelineConfig, PipelineConfigBuilder, ProblemType};
+// Cancellation token
+pub use cancellation::CancellationToken;
 // Error types
 pub use error::LexLearningError;
 // Model types

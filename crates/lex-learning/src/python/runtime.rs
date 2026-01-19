@@ -450,6 +450,13 @@ fn setup_python_environment(runtime_dir: &Path, python_src_dir: &Path) -> Result
 
         // Disable __pycache__ to avoid permission issues
         env::set_var("PYTHONDONTWRITEBYTECODE", "1");
+
+        // On Linux, set LD_LIBRARY_PATH so Python child processes can find libpython
+        #[cfg(target_os = "linux")]
+        {
+            let lib_dir = runtime_dir.join("lib");
+            env::set_var("LD_LIBRARY_PATH", lib_dir);
+        }
     }
 
     Ok(())
