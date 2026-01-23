@@ -191,6 +191,18 @@ pub fn run() {
             commands::get_preprocessing_ui_state,
             // Saves preprocessing page state for navigation persistence
             commands::set_preprocessing_ui_state,
+            // Analysis commands
+            // Gets cached analysis results for current dataset
+            commands::get_analysis_result,
+            // Runs full analysis for selected dataset
+            commands::run_analysis,
+            // Clears cached analysis results
+            commands::clear_analysis_results,
+            // Exports analysis report to JSON
+            commands::export_analysis_report,
+            // Analysis UI state persistence
+            commands::get_analysis_ui_state,
+            commands::set_analysis_ui_state,
             // ML commands
             commands::is_ml_initialized,
             commands::initialize_ml,

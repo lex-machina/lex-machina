@@ -56,7 +56,10 @@
 //! - `processed_dataframe` - Can be regenerated from source
 
 use lex_learning::{CancellationToken as MLCancellationToken, TrainingResult};
-use lex_processing::{CancellationToken, PipelineConfig, PreprocessingSummary};
+use lex_processing::{
+    CancellationToken, ColumnProfile, DataQualityIssue, DatasetProfile, PipelineConfig,
+    PreprocessingSummary,
+};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
@@ -523,6 +526,266 @@ impl Default for MLConfigUIState {
     }
 }
 
+// ============================================================================
+// ANALYSIS STATE TYPES
+// ============================================================================
+
+/// Dataset selection for analysis results.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::AnalysisDataset`
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AnalysisDataset {
+    Original,
+    Processed,
+}
+
+/// UI state for the analysis page.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::AnalysisUIState`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisUIState {
+    /// Whether to use processed data for analysis
+    pub use_processed_data: bool,
+    /// Active tab in the analysis workspace
+    pub active_tab: String,
+    /// Selected column for focused analysis
+    pub selected_column: Option<String>,
+}
+
+impl Default for AnalysisUIState {
+    fn default() -> Self {
+        Self {
+            use_processed_data: false,
+            active_tab: "overview".to_string(),
+            selected_column: None,
+        }
+    }
+}
+
+/// High-level summary of the dataset analysis.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::AnalysisSummary`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisSummary {
+    pub rows: usize,
+    pub columns: usize,
+    pub memory_bytes: u64,
+    pub duplicate_count: usize,
+    pub duplicate_percentage: f64,
+    pub total_missing_cells: usize,
+    pub total_missing_percentage: f64,
+    pub type_distribution: Vec<TypeDistributionEntry>,
+}
+
+/// Type distribution entry for dataset summary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeDistributionEntry {
+    pub dtype: String,
+    pub count: usize,
+    pub percentage: f64,
+}
+
+/// Histogram bin for numeric and text distributions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistogramBin {
+    pub start: f64,
+    pub end: f64,
+    pub count: usize,
+}
+
+/// Box plot summary values for numeric columns.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BoxPlotSummary {
+    pub min: f64,
+    pub q1: f64,
+    pub median: f64,
+    pub q3: f64,
+    pub max: f64,
+}
+
+/// Simple category count entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoryCount {
+    pub value: String,
+    pub count: usize,
+    pub percentage: f64,
+}
+
+/// Time series bin for datetime columns.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeBin {
+    pub label: String,
+    pub count: usize,
+}
+
+/// Statistical test result entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatisticalTestResult {
+    pub test: String,
+    pub statistic: f64,
+    pub p_value: f64,
+    pub df: Option<f64>,
+    pub effect_size: Option<f64>,
+    pub notes: Option<String>,
+}
+
+/// Numeric column analysis results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumericColumnStats {
+    pub min: f64,
+    pub max: f64,
+    pub mean: f64,
+    pub median: f64,
+    pub std_dev: f64,
+    pub variance: f64,
+    pub iqr: f64,
+    pub skewness: f64,
+    pub kurtosis: f64,
+    pub outliers_iqr: usize,
+    pub outliers_robust_z: usize,
+    pub histogram: Vec<HistogramBin>,
+    pub box_plot: BoxPlotSummary,
+    pub normality_tests: Vec<StatisticalTestResult>,
+}
+
+/// Categorical column analysis results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoricalColumnStats {
+    pub cardinality: usize,
+    pub entropy: f64,
+    pub gini: f64,
+    pub imbalance_ratio: f64,
+    pub top_values: Vec<CategoryCount>,
+}
+
+/// Text column analysis results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextColumnStats {
+    pub min_length: usize,
+    pub max_length: usize,
+    pub mean_length: f64,
+    pub median_length: f64,
+    pub empty_percentage: f64,
+    pub whitespace_percentage: f64,
+    pub unique_token_count: usize,
+    pub length_histogram: Vec<HistogramBin>,
+}
+
+/// Datetime column analysis results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DateTimeColumnStats {
+    pub min: String,
+    pub max: String,
+    pub range_days: f64,
+    pub granularity: String,
+    pub time_bins: Vec<TimeBin>,
+}
+
+/// Per-column analysis entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisColumnStats {
+    pub profile: ColumnProfile,
+    pub numeric: Option<NumericColumnStats>,
+    pub categorical: Option<CategoricalColumnStats>,
+    pub text: Option<TextColumnStats>,
+    pub datetime: Option<DateTimeColumnStats>,
+}
+
+/// Missingness analysis summary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MissingnessAnalysis {
+    pub total_missing_cells: usize,
+    pub total_missing_percentage: f64,
+    pub per_column: Vec<MissingnessColumn>,
+    pub co_missing_matrix: HeatmapMatrix,
+}
+
+/// Missingness entry for a single column.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MissingnessColumn {
+    pub column: String,
+    pub missing_count: usize,
+    pub missing_percentage: f64,
+}
+
+/// Heatmap matrix structure for correlations/associations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeatmapMatrix {
+    pub x_labels: Vec<String>,
+    pub y_labels: Vec<String>,
+    pub values: Vec<Vec<f64>>,
+    pub p_values: Option<Vec<Vec<f64>>>,
+}
+
+/// Correlation analysis results for numeric columns.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorrelationAnalysis {
+    pub numeric_columns: Vec<String>,
+    pub pearson: HeatmapMatrix,
+    pub spearman: HeatmapMatrix,
+    pub top_pairs: Vec<CorrelationPair>,
+}
+
+/// Correlation pair entry for top correlations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorrelationPair {
+    pub column_x: String,
+    pub column_y: String,
+    pub method: String,
+    pub estimate: f64,
+    pub p_value: f64,
+}
+
+/// Association analysis for categorical and mixed column pairs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssociationAnalysis {
+    pub categorical_columns: Vec<String>,
+    pub cramers_v: HeatmapMatrix,
+    pub chi_square: HeatmapMatrix,
+    pub numeric_categorical: Vec<NumericCategoricalAssociation>,
+}
+
+/// Numeric-categorical association results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumericCategoricalAssociation {
+    pub numeric_column: String,
+    pub categorical_column: String,
+    pub anova: Option<StatisticalTestResult>,
+    pub variance_test: Option<StatisticalTestResult>,
+    pub kruskal: Option<StatisticalTestResult>,
+    pub t_test: Option<StatisticalTestResult>,
+    pub mann_whitney: Option<StatisticalTestResult>,
+}
+
+/// Full analysis result cached in state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisResult {
+    pub dataset: AnalysisDataset,
+    pub generated_at: String,
+    pub duration_ms: u64,
+    pub summary: AnalysisSummary,
+    pub dataset_profile: DatasetProfile,
+    pub columns: Vec<AnalysisColumnStats>,
+    pub missingness: MissingnessAnalysis,
+    pub correlations: CorrelationAnalysis,
+    pub associations: AssociationAnalysis,
+    pub quality_issues: Vec<DataQualityIssue>,
+}
+
+/// Cached analysis results for original and processed datasets.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AnalysisCache {
+    pub original: Option<AnalysisResult>,
+    pub processed: Option<AnalysisResult>,
+}
+
 /// A snapshot of ML configuration for history entries.
 ///
 /// Mirrors the frontend MLConfigSnapshot type.
@@ -679,6 +942,15 @@ pub struct AppState {
     /// Session-only: not persisted to disk.
     pub preprocessing_ui_state: RwLock<PreprocessingUIState>,
 
+    /// Cached analysis results for original and processed datasets.
+    /// Session-only: not persisted to disk.
+    pub analysis_results: RwLock<AnalysisCache>,
+
+    /// UI state for the analysis page.
+    /// Persists dataset toggle, active tab, and column focus.
+    /// Session-only: not persisted to disk.
+    pub analysis_ui_state: RwLock<AnalysisUIState>,
+
     // ============================================================================
     // ML STATE FIELDS
     // ============================================================================
@@ -727,6 +999,8 @@ impl AppState {
             theme: RwLock::new(Theme::default()),
             nav_bar_position: RwLock::new(NavBarPosition::default()),
             preprocessing_ui_state: RwLock::new(PreprocessingUIState::default()),
+            analysis_results: RwLock::new(AnalysisCache::default()),
+            analysis_ui_state: RwLock::new(AnalysisUIState::default()),
             trained_model: RwLock::new(None),
             training_result: RwLock::new(None),
             training_history: RwLock::new(Vec::new()),

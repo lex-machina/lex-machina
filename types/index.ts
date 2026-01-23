@@ -692,6 +692,230 @@ export interface MLKernelStatusPayload {
 export type MLProgressPayload = MLProgressUpdate;
 
 // ============================================================================
+// ANALYSIS TYPES (Mirrors analysis.rs + state.rs)
+// ============================================================================
+
+export interface ColumnProfile {
+    name: string;
+    dtype: string;
+    unique_count: number;
+    null_count: number;
+    null_percentage: number;
+    sample_values: string[];
+    inferred_type: string;
+    inferred_role: string;
+    characteristics: Record<string, unknown>;
+}
+
+export interface DatasetProfile {
+    shape: [number, number];
+    column_profiles: ColumnProfile[];
+    target_candidates: string[];
+    problem_type_candidates: string[];
+    complexity_indicators: Record<string, unknown>;
+    duplicate_count: number;
+    duplicate_percentage: number;
+}
+
+export interface SolutionOption {
+    option: string;
+    description: string;
+    pros?: string;
+    cons?: string;
+    best_for?: string;
+}
+
+export interface DataQualityIssue {
+    issue_type: string;
+    severity: string;
+    affected_columns: string[];
+    description: string;
+    business_impact: string;
+    detection_details: Record<string, unknown>;
+    suggested_solutions: SolutionOption[];
+}
+
+export type AnalysisDataset = "original" | "processed";
+
+export interface AnalysisUIState {
+    use_processed_data: boolean;
+    active_tab: string;
+    selected_column: string | null;
+}
+
+export interface AnalysisSummary {
+    rows: number;
+    columns: number;
+    memory_bytes: number;
+    duplicate_count: number;
+    duplicate_percentage: number;
+    total_missing_cells: number;
+    total_missing_percentage: number;
+    type_distribution: TypeDistributionEntry[];
+}
+
+export interface TypeDistributionEntry {
+    dtype: string;
+    count: number;
+    percentage: number;
+}
+
+export interface HistogramBin {
+    start: number;
+    end: number;
+    count: number;
+}
+
+export interface BoxPlotSummary {
+    min: number;
+    q1: number;
+    median: number;
+    q3: number;
+    max: number;
+}
+
+export interface CategoryCount {
+    value: string;
+    count: number;
+    percentage: number;
+}
+
+export interface TimeBin {
+    label: string;
+    count: number;
+}
+
+export interface StatisticalTestResult {
+    test: string;
+    statistic: number;
+    p_value: number;
+    df?: number | null;
+    effect_size?: number | null;
+    notes?: string | null;
+}
+
+export interface NumericColumnStats {
+    min: number;
+    max: number;
+    mean: number;
+    median: number;
+    std_dev: number;
+    variance: number;
+    iqr: number;
+    skewness: number;
+    kurtosis: number;
+    outliers_iqr: number;
+    outliers_robust_z: number;
+    histogram: HistogramBin[];
+    box_plot: BoxPlotSummary;
+    normality_tests: StatisticalTestResult[];
+}
+
+export interface CategoricalColumnStats {
+    cardinality: number;
+    entropy: number;
+    gini: number;
+    imbalance_ratio: number;
+    top_values: CategoryCount[];
+}
+
+export interface TextColumnStats {
+    min_length: number;
+    max_length: number;
+    mean_length: number;
+    median_length: number;
+    empty_percentage: number;
+    whitespace_percentage: number;
+    unique_token_count: number;
+    length_histogram: HistogramBin[];
+}
+
+export interface DateTimeColumnStats {
+    min: string;
+    max: string;
+    range_days: number;
+    granularity: string;
+    time_bins: TimeBin[];
+}
+
+export interface AnalysisColumnStats {
+    profile: ColumnProfile;
+    numeric?: NumericColumnStats | null;
+    categorical?: CategoricalColumnStats | null;
+    text?: TextColumnStats | null;
+    datetime?: DateTimeColumnStats | null;
+}
+
+export interface MissingnessColumn {
+    column: string;
+    missing_count: number;
+    missing_percentage: number;
+}
+
+export interface HeatmapMatrix {
+    x_labels: string[];
+    y_labels: string[];
+    values: number[][];
+    p_values?: number[][] | null;
+}
+
+export interface MissingnessAnalysis {
+    total_missing_cells: number;
+    total_missing_percentage: number;
+    per_column: MissingnessColumn[];
+    co_missing_matrix: HeatmapMatrix;
+}
+
+export interface CorrelationPair {
+    column_x: string;
+    column_y: string;
+    method: string;
+    estimate: number;
+    p_value: number;
+}
+
+export interface CorrelationAnalysis {
+    numeric_columns: string[];
+    pearson: HeatmapMatrix;
+    spearman: HeatmapMatrix;
+    top_pairs: CorrelationPair[];
+}
+
+export interface NumericCategoricalAssociation {
+    numeric_column: string;
+    categorical_column: string;
+    anova?: StatisticalTestResult | null;
+    variance_test?: StatisticalTestResult | null;
+    kruskal?: StatisticalTestResult | null;
+    t_test?: StatisticalTestResult | null;
+    mann_whitney?: StatisticalTestResult | null;
+}
+
+export interface AssociationAnalysis {
+    categorical_columns: string[];
+    cramers_v: HeatmapMatrix;
+    chi_square: HeatmapMatrix;
+    numeric_categorical: NumericCategoricalAssociation[];
+}
+
+export interface AnalysisResult {
+    dataset: AnalysisDataset;
+    generated_at: string;
+    duration_ms: number;
+    summary: AnalysisSummary;
+    dataset_profile: DatasetProfile;
+    columns: AnalysisColumnStats[];
+    missingness: MissingnessAnalysis;
+    correlations: CorrelationAnalysis;
+    associations: AssociationAnalysis;
+    quality_issues: DataQualityIssue[];
+}
+
+export interface AnalysisExportResult {
+    report_path: string;
+}
+
+// ============================================================================
 // PREPROCESSING UI STATE (for navigation persistence)
 // ============================================================================
 

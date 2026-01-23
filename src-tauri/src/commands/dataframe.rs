@@ -311,6 +311,12 @@ pub fn close_file(app: AppHandle, state: State<'_, AppState>) {
         state.preprocessing_history.write().clear();
     }
 
+    // Clear analysis cache and UI state
+    {
+        *state.analysis_results.write() = crate::state::AnalysisCache::default();
+        *state.analysis_ui_state.write() = crate::state::AnalysisUIState::default();
+    }
+
     // Emit file closed event
     app.emit_file_closed();
 }

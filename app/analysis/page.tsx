@@ -1,18 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import {
-    BarChart3,
-    PieChart,
-    TrendingUp,
-    FileSearch,
-    Table2,
-} from "lucide-react";
+"use client";
 
-import { useFileState } from "@/lib/hooks/use-file-state";
+import Link from "next/link";
+import { useEffect, useMemo } from "react";
+import { BarChart3 } from "lucide-react";
+
 import AppShell from "@/components/layout/app-shell";
+import { AnalysisSidebar, AnalysisWorkspace } from "@/components/analysis";
 import { Button } from "@/components/ui/button";
-import { formatNumber } from "@/lib/utils";
+import { useAnalysis } from "@/lib/hooks/use-analysis";
+import { useAnalysisUIState } from "@/lib/hooks/use-analysis-ui-state";
+import { useFileState } from "@/lib/hooks/use-file-state";
+import { useProcessedData } from "@/lib/hooks/use-processed-data";
 
 /**
  * Empty state component shown when no file is loaded.
@@ -31,116 +31,42 @@ function NoFileLoadedState() {
                     Statistical Analysis
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                    Import a dataset to explore statistical insights and
-                    visualize your data distributions.
+                    Import a dataset to run full statistical profiling,
+                    correlations, and quality diagnostics.
                 </p>
-
-                {/* Features */}
-                <ul className="text-muted-foreground mb-8 space-y-2 text-left text-sm">
-                    <li className="flex items-center gap-3">
-                        <TrendingUp className="h-4 w-4 shrink-0" />
-                        <span>Descriptive statistics (mean, median, std)</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                        <PieChart className="h-4 w-4 shrink-0" />
-                        <span>Distribution histograms and charts</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                        <Table2 className="h-4 w-4 shrink-0" />
-                        <span>Correlation matrix analysis</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                        <FileSearch className="h-4 w-4 shrink-0" />
-                        <span>Missing value detection and profiling</span>
-                    </li>
-                </ul>
 
                 {/* Action button */}
                 <Button asChild size="lg">
-                    <Link href="/data">
-                        <Table2 className="mr-2 h-4 w-4" />
-                        Go to Data
-                    </Link>
+                    <Link href="/data">Go to Data</Link>
                 </Button>
             </div>
         </div>
     );
 }
 
-/**
- * Analysis Sidebar - Analysis options and results summary.
- */
-const AnalysisSidebar = () => {
-    const { fileInfo } = useFileState();
-
-    if (!fileInfo) {
-        return (
-            <div className="p-4">
-                <p className="text-muted-foreground text-sm">
-                    Load a file to run analysis
-                </p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-5 p-4">
-            <section>
-                <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
-                    Dataset
-                </h2>
-                <dl className="space-y-2 text-sm">
-                    <div>
-                        <dt className="text-muted-foreground">File</dt>
-                        <dd className="truncate font-medium">
-                            {fileInfo.name}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground">Rows</dt>
-                        <dd className="font-medium">
-                            {formatNumber(fileInfo.row_count)}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground">Columns</dt>
-                        <dd className="font-medium">
-                            {formatNumber(fileInfo.column_count)}
-                        </dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section>
-                <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
-                    Analysis Options
-                </h2>
-                <p className="text-muted-foreground text-sm">Coming soon...</p>
-            </section>
-        </div>
-    );
-};
-
-/**
- * Analysis Content - Main analysis workspace.
- */
-const AnalysisContent = () => {
-    const { isFileLoaded } = useFileState();
-
-    if (!isFileLoaded) {
-        return <NoFileLoadedState />;
-    }
-
+const NoAnalysisState = ({
+    onRun,
+    isRunning,
+    error,
+}: {
+    onRun: () => void;
+    isRunning: boolean;
+    error: string | null;
+}) => {
     return (
         <div className="flex flex-1 items-center justify-center">
-            <div className="text-center">
-                <h2 className="mb-2 text-xl font-semibold">
-                    Analysis Coming Soon
-                </h2>
-                <p className="text-muted-foreground max-w-md">
-                    This page will provide statistical analysis, data profiling,
-                    histograms, correlation matrices, and more.
+            <div className="max-w-md text-center">
+                <h2 className="mb-2 text-xl font-semibold">Ready to analyze</h2>
+                <p className="text-muted-foreground mb-4">
+                    Run the analysis pipeline to generate full profiling,
+                    diagnostics, and charts.
                 </p>
+                {error && (
+                    <p className="text-destructive mb-4 text-sm">{error}</p>
+                )}
+                <Button onClick={onRun} disabled={isRunning} size="lg">
+                    {isRunning ? "Running analysis..." : "Run Analysis"}
+                </Button>
             </div>
         </div>
     );
@@ -157,9 +83,149 @@ const AnalysisContent = () => {
  * - Missing value analysis
  */
 const AnalysisPage = () => {
+    const { fileInfo, isFileLoaded } = useFileState();
+    const processedData = useProcessedData();
+    const { status, result, error, runAnalysis, loadCached, exportReport } =
+        useAnalysis();
+
+    const availableColumns = useMemo(() => {
+        if (processedData.fileInfo) {
+            return [
+                ...processedData.fileInfo.columns,
+                ...(fileInfo?.columns ?? []),
+            ];
+        }
+        return fileInfo?.columns ?? [];
+    }, [processedData.fileInfo, fileInfo?.columns]);
+
+    const { isLoaded, uiState, setUIState } =
+        useAnalysisUIState(availableColumns);
+
+    useEffect(() => {
+        if (!isLoaded || !isFileLoaded) {
+            return;
+        }
+
+        loadCached(uiState.use_processed_data).catch(() => {
+            // handled in hook
+        });
+    }, [isLoaded, isFileLoaded, uiState.use_processed_data, loadCached]);
+
+    const activeFileInfo = uiState.use_processed_data
+        ? processedData.fileInfo
+        : fileInfo;
+
+    const handleRun = () => {
+        runAnalysis(uiState.use_processed_data).catch(() => {
+            // handled in hook
+        });
+    };
+
+    const handleExport = () => {
+        exportReport(uiState.use_processed_data).catch(() => {
+            // handled in hook
+        });
+    };
+
+    const handleToggleDataset = (useProcessed: boolean) => {
+        if (useProcessed && !processedData.hasProcessedData) {
+            return;
+        }
+        setUIState({
+            ...uiState,
+            use_processed_data: useProcessed,
+        });
+    };
+
+    useEffect(() => {
+        if (!uiState.selected_column) {
+            return;
+        }
+        const columns = uiState.use_processed_data
+            ? processedData.fileInfo?.columns
+            : fileInfo?.columns;
+        if (!columns) {
+            return;
+        }
+        const exists = columns.some(
+            (column) => column.name === uiState.selected_column,
+        );
+        if (!exists) {
+            setUIState({
+                ...uiState,
+                selected_column: null,
+            });
+        }
+    }, [
+        uiState.selected_column,
+        uiState.use_processed_data,
+        processedData.fileInfo?.columns,
+        fileInfo?.columns,
+        setUIState,
+    ]);
+
+    if (!isLoaded) {
+        return (
+            <AppShell sidebar={<div className="p-4" />}>
+                <div className="text-muted-foreground flex h-full items-center justify-center">
+                    Loading...
+                </div>
+            </AppShell>
+        );
+    }
+
     return (
-        <AppShell sidebar={<AnalysisSidebar />}>
-            <AnalysisContent />
+        <AppShell
+            sidebar={
+                <AnalysisSidebar
+                    datasetName={activeFileInfo?.name ?? null}
+                    rows={activeFileInfo?.row_count ?? 0}
+                    columns={activeFileInfo?.column_count ?? 0}
+                    memoryBytes={result?.summary.memory_bytes ?? null}
+                    useProcessedData={uiState.use_processed_data}
+                    hasProcessedData={processedData.hasProcessedData}
+                    status={status}
+                    hasResult={Boolean(result)}
+                    onToggleDataset={handleToggleDataset}
+                    onRun={handleRun}
+                    onExport={handleExport}
+                />
+            }
+        >
+            {!isFileLoaded && <NoFileLoadedState />}
+            {isFileLoaded && !result && (
+                <NoAnalysisState
+                    onRun={handleRun}
+                    isRunning={status === "running"}
+                    error={error}
+                />
+            )}
+            {isFileLoaded && result && (
+                <div className="flex flex-1 flex-col overflow-hidden p-3">
+                    {error && (
+                        <div className="text-destructive mb-2 text-sm">
+                            {error}
+                        </div>
+                    )}
+                    <AnalysisWorkspace
+                        analysis={result}
+                        activeTab={uiState.active_tab}
+                        onTabChange={(tab) =>
+                            setUIState({
+                                ...uiState,
+                                active_tab: tab,
+                            })
+                        }
+                        selectedColumn={uiState.selected_column}
+                        onSelectColumn={(column) =>
+                            setUIState({
+                                ...uiState,
+                                selected_column: column,
+                            })
+                        }
+                    />
+                </div>
+            )}
         </AppShell>
     );
 };

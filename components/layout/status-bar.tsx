@@ -152,13 +152,18 @@ const StatusBar = () => {
                 );
 
             case "/analysis":
-            case "/ml":
-                // Analysis/ML: Coming soon + version
                 return (
                     <>
-                        <span className="text-muted-foreground/60">
-                            Coming Soon
-                        </span>
+                        <span>Analysis</span>
+                        <span className="text-muted-foreground/60">|</span>
+                        <span>{APP_VERSION}</span>
+                    </>
+                );
+
+            case "/ml":
+                return (
+                    <>
+                        <span>ML</span>
                         <span className="text-muted-foreground/60">|</span>
                         <span>{APP_VERSION}</span>
                     </>
