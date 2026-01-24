@@ -194,6 +194,10 @@ pub fn run() {
             // Analysis commands
             // Gets cached analysis results for current dataset
             commands::get_analysis_result,
+            // Gets filtered column list for analysis panel
+            commands::get_analysis_columns_view,
+            // Gets capped heatmap matrix for analysis panels
+            commands::get_analysis_heatmap_view,
             // Runs full analysis for selected dataset
             commands::run_analysis,
             // Clears cached analysis results
@@ -203,6 +207,12 @@ pub fn run() {
             // Analysis UI state persistence
             commands::get_analysis_ui_state,
             commands::set_analysis_ui_state,
+            // Visualizations commands
+            commands::get_visualizations_result,
+            commands::run_visualizations,
+            commands::clear_visualizations_results,
+            commands::get_visualizations_ui_state,
+            commands::set_visualizations_ui_state,
             // ML commands
             commands::is_ml_initialized,
             commands::initialize_ml,
@@ -215,6 +225,8 @@ pub fn run() {
             commands::load_model,
             commands::predict_single,
             commands::predict_batch,
+            commands::predict_batch_from_csv,
+            commands::export_batch_predictions,
             commands::get_training_history,
             commands::clear_training_history,
             commands::get_ml_ui_state,

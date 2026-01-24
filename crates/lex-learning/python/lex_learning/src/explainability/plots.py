@@ -123,6 +123,33 @@ def generate_bar_plot(
         return None
 
 
+def generate_beeswarm_plot(
+    shap_values: NDArray[Any],
+    X: NDArray[Any],
+    feature_names: list[str],
+) -> bytes | None:
+    """Generate SHAP beeswarm/violin plot as PNG bytes."""
+    shap = get_shap_module()
+    if shap is None:
+        return None
+
+    try:
+        plt.figure(figsize=(10, 8))
+        shap.summary_plot(
+            shap_values,
+            X,
+            feature_names=feature_names,
+            show=False,
+            plot_type="violin",
+        )
+        return render_plot_to_bytes()
+
+    except Exception as e:
+        logger.warning(f"Beeswarm plot generation failed: {e}")
+        plt.close("all")
+        return None
+
+
 def generate_waterfall_plot(
     shap_values: NDArray[Any],
     X: NDArray[Any],
@@ -143,6 +170,65 @@ def generate_waterfall_plot(
     shap = get_shap_module()
     if shap is None:
         return None
+
+
+def generate_decision_plot(
+    shap_values: NDArray[Any],
+    base_value: float,
+    feature_names: list[str],
+) -> bytes | None:
+    """Generate SHAP decision plot for a small sample."""
+    shap = get_shap_module()
+    if shap is None:
+        return None
+
+    try:
+        sample = shap_values[:50]
+        plt.figure(figsize=(10, 6))
+        shap.decision_plot(base_value, sample, feature_names=feature_names, show=False)
+        return render_plot_to_bytes()
+
+    except Exception as e:
+        logger.warning(f"Decision plot generation failed: {e}")
+        plt.close("all")
+        return None
+
+
+def generate_dependence_plots(
+    shap_values: NDArray[Any],
+    X: NDArray[Any],
+    feature_names: list[str],
+    max_features: int = 2,
+) -> dict[str, bytes]:
+    """Generate SHAP dependence plots for top features."""
+    shap = get_shap_module()
+    if shap is None:
+        return {}
+
+    try:
+        mean_abs = np.abs(shap_values).mean(axis=0)
+        sorted_idx = np.argsort(mean_abs)[::-1]
+        plots: dict[str, bytes] = {}
+
+        for idx in sorted_idx[:max_features]:
+            plt.figure(figsize=(8, 6))
+            shap.dependence_plot(
+                idx,
+                shap_values,
+                X,
+                feature_names=feature_names,
+                show=False,
+            )
+            bytes_data = render_plot_to_bytes()
+            if bytes_data:
+                plots[feature_names[idx]] = bytes_data
+
+        return plots
+
+    except Exception as e:
+        logger.warning(f"Dependence plot generation failed: {e}")
+        plt.close("all")
+        return {}
 
     try:
         # Create explanation for first instance
@@ -186,8 +272,10 @@ def save_plots_to_disk(
 
     plot_mapping = [
         (result.summary_plot, f"{prefix}_summary.png"),
-        (result.beeswarm_plot, f"{prefix}_importance_bar.png"),
-        (result.feature_importance_plot, f"{prefix}_waterfall.png"),
+        (result.beeswarm_plot, f"{prefix}_beeswarm.png"),
+        (result.feature_importance_plot, f"{prefix}_importance_bar.png"),
+        (result.waterfall_plot, f"{prefix}_waterfall.png"),
+        (result.decision_plot, f"{prefix}_decision.png"),
     ]
 
     for plot_bytes, filename in plot_mapping:
@@ -196,6 +284,12 @@ def save_plots_to_disk(
             path.write_bytes(plot_bytes)
             saved_paths.append(path)
             logger.info(f"Saved plot to {path}")
+
+    for name, plot_bytes in result.dependence_plots.items():
+        path = output_dir / f"{prefix}_dependence_{name}.png"
+        path.write_bytes(plot_bytes)
+        saved_paths.append(path)
+        logger.info(f"Saved plot to {path}")
 
     return saved_paths
 

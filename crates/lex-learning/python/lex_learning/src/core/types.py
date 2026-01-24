@@ -36,6 +36,9 @@ class ExplainabilityResult:
     summary_plot: bytes | None = None
     beeswarm_plot: bytes | None = None
     feature_importance_plot: bytes | None = None
+    waterfall_plot: bytes | None = None
+    decision_plot: bytes | None = None
+    dependence_plots: dict[str, bytes] = field(default_factory=dict)
 
     # Feature importance as (feature_name, importance_value) pairs
     feature_importance: list[tuple[str, float]] = field(default_factory=list)

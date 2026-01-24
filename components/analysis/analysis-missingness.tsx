@@ -1,21 +1,37 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useAnalysisHeatmap } from "@/lib/hooks/use-analysis-heatmap";
 import { formatNumber } from "@/lib/utils";
-import type { MissingnessAnalysis } from "@/types";
+import type { AnalysisDataset, MissingnessAnalysis } from "@/types";
 
 import AnalysisHeatmap from "./analysis-heatmap";
 
 interface AnalysisMissingnessProps {
+    dataset: AnalysisDataset;
     missingness: MissingnessAnalysis;
 }
 
-const AnalysisMissingness = ({ missingness }: AnalysisMissingnessProps) => {
+const AnalysisMissingness = ({
+    dataset,
+    missingness,
+}: AnalysisMissingnessProps) => {
+    const useProcessedData = dataset === "processed";
+    const heatmap = useAnalysisHeatmap(useProcessedData, "missingness");
+
     return (
-        <div className="grid h-full grid-cols-[360px_1fr] gap-3">
-            <Card className="min-h-0">
-                <CardHeader title="Missingness" />
-                <CardContent scrollable>
+        <div className="flex h-full min-h-0 gap-3">
+            <Card className="h-full min-h-0 flex-[1_1_0%]">
+                <CardHeader
+                    title="Missingness"
+                    actions={
+                        <span className="text-muted-foreground text-xs">
+                            {missingness.total_missing_percentage.toFixed(1)}%
+                            overall
+                        </span>
+                    }
+                />
+                <CardContent scrollable padded>
                     <div className="space-y-2 text-sm">
                         {missingness.per_column.map((entry) => (
                             <div
@@ -33,10 +49,17 @@ const AnalysisMissingness = ({ missingness }: AnalysisMissingnessProps) => {
                 </CardContent>
             </Card>
 
-            <AnalysisHeatmap
-                title="Co-missing Heatmap"
-                matrix={missingness.co_missing_matrix}
-            />
+            <div className="h-full min-h-0 flex-[2_1_0%]">
+                <AnalysisHeatmap
+                    title="Co-missing Heatmap"
+                    variant="sequential"
+                    view={heatmap.view}
+                    isLoading={heatmap.isLoading}
+                    error={heatmap.error}
+                    hasData={missingness.per_column.length > 0}
+                    fillHeight
+                />
+            </div>
         </div>
     );
 };

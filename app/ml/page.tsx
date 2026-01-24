@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AppShell from "@/components/layout/app-shell";
 import {
@@ -50,7 +50,7 @@ export default function MLPage() {
         getHistory,
         clearHistory,
         predictSingle,
-        predictBatch,
+        predictBatchFromCsv,
         refreshKernelStatus,
     } = useML();
 
@@ -73,6 +73,16 @@ export default function MLPage() {
         processedData.fileInfo,
         fileInfo?.columns,
     ]);
+
+    const predictionColumns = useMemo(
+        () =>
+            uiState.target_column
+                ? availableColumns.filter(
+                      (column) => column.name !== uiState.target_column,
+                  )
+                : availableColumns,
+        [availableColumns, uiState.target_column],
+    );
 
     useEffect(() => {
         if (!uiState.target_column) {
@@ -106,6 +116,22 @@ export default function MLPage() {
             active_tab: tab,
         });
     };
+
+    const previousTrainingStatus = useRef(trainingStatus);
+
+    useEffect(() => {
+        if (
+            previousTrainingStatus.current !== "completed" &&
+            trainingStatus === "completed" &&
+            uiState.active_tab !== "overview"
+        ) {
+            setUIState({
+                ...uiState,
+                active_tab: "overview",
+            });
+        }
+        previousTrainingStatus.current = trainingStatus;
+    }, [trainingStatus, uiState, setUIState]);
 
     const handleHistorySelect = (entry: TrainingHistoryEntry) => {
         setUIState({
@@ -246,9 +272,9 @@ export default function MLPage() {
                 </div>
                 <div className="min-h-0">
                     <MLPredictionPanel
-                        columns={availableColumns}
+                        columns={predictionColumns}
                         onPredictSingle={predictSingle}
-                        onPredictBatch={predictBatch}
+                        onPredictBatchFromCsv={predictBatchFromCsv}
                         disabled={!hasModel || trainingStatus === "training"}
                     />
                 </div>

@@ -1,9 +1,7 @@
 "use client";
 
-"use client";
-
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3 } from "lucide-react";
 
 import AppShell from "@/components/layout/app-shell";
@@ -13,6 +11,7 @@ import { useAnalysis } from "@/lib/hooks/use-analysis";
 import { useAnalysisUIState } from "@/lib/hooks/use-analysis-ui-state";
 import { useFileState } from "@/lib/hooks/use-file-state";
 import { useProcessedData } from "@/lib/hooks/use-processed-data";
+import { cn } from "@/lib/utils";
 
 /**
  * Empty state component shown when no file is loaded.
@@ -87,6 +86,10 @@ const AnalysisPage = () => {
     const processedData = useProcessedData();
     const { status, result, error, runAnalysis, loadCached, exportReport } =
         useAnalysis();
+    const [exportMessage, setExportMessage] = useState<string | null>(null);
+    const [exportStatus, setExportStatus] = useState<
+        "success" | "error" | null
+    >(null);
 
     const availableColumns = useMemo(() => {
         if (processedData.fileInfo) {
@@ -114,17 +117,33 @@ const AnalysisPage = () => {
     const activeFileInfo = uiState.use_processed_data
         ? processedData.fileInfo
         : fileInfo;
+    const datasetLabel = uiState.use_processed_data ? "Processed" : "Original";
 
     const handleRun = () => {
+        setExportMessage(null);
+        setExportStatus(null);
         runAnalysis(uiState.use_processed_data).catch(() => {
             // handled in hook
         });
     };
 
     const handleExport = () => {
-        exportReport(uiState.use_processed_data).catch(() => {
-            // handled in hook
-        });
+        exportReport(uiState.use_processed_data)
+            .then((response) => {
+                const fileName = response.report_path.split(/[\\/]/).pop();
+                setExportStatus("success");
+                setExportMessage(
+                    fileName
+                        ? `Report saved to ${fileName}`
+                        : "Report exported",
+                );
+            })
+            .catch((err) => {
+                const message =
+                    err instanceof Error ? err.message : String(err);
+                setExportStatus("error");
+                setExportMessage(message);
+            });
     };
 
     const handleToggleDataset = (useProcessed: boolean) => {
@@ -182,10 +201,15 @@ const AnalysisPage = () => {
                     rows={activeFileInfo?.row_count ?? 0}
                     columns={activeFileInfo?.column_count ?? 0}
                     memoryBytes={result?.summary.memory_bytes ?? null}
+                    datasetLabel={datasetLabel}
+                    generatedAt={result?.generated_at ?? null}
+                    durationMs={result?.duration_ms ?? null}
                     useProcessedData={uiState.use_processed_data}
                     hasProcessedData={processedData.hasProcessedData}
                     status={status}
                     hasResult={Boolean(result)}
+                    exportMessage={exportMessage}
+                    exportStatus={exportStatus}
                     onToggleDataset={handleToggleDataset}
                     onRun={handleRun}
                     onExport={handleExport}
@@ -201,29 +225,46 @@ const AnalysisPage = () => {
                 />
             )}
             {isFileLoaded && result && (
-                <div className="flex flex-1 flex-col overflow-hidden p-3">
-                    {error && (
-                        <div className="text-destructive mb-2 text-sm">
-                            {error}
+                <div className="flex flex-1 flex-col overflow-hidden">
+                    <div className="relative flex flex-1 flex-col overflow-hidden p-3">
+                        <div
+                            className={cn(
+                                "flex flex-1 flex-col overflow-hidden",
+                                status === "running" && "opacity-60",
+                            )}
+                        >
+                            {error && (
+                                <div className="text-destructive mb-2 text-sm">
+                                    {error}
+                                </div>
+                            )}
+                            <AnalysisWorkspace
+                                analysis={result}
+                                activeTab={uiState.active_tab}
+                                dataset={result.dataset}
+                                onTabChange={(tab) =>
+                                    setUIState({
+                                        ...uiState,
+                                        active_tab: tab,
+                                    })
+                                }
+                                selectedColumn={uiState.selected_column}
+                                onSelectColumn={(column) =>
+                                    setUIState({
+                                        ...uiState,
+                                        selected_column: column,
+                                    })
+                                }
+                            />
                         </div>
-                    )}
-                    <AnalysisWorkspace
-                        analysis={result}
-                        activeTab={uiState.active_tab}
-                        onTabChange={(tab) =>
-                            setUIState({
-                                ...uiState,
-                                active_tab: tab,
-                            })
-                        }
-                        selectedColumn={uiState.selected_column}
-                        onSelectColumn={(column) =>
-                            setUIState({
-                                ...uiState,
-                                selected_column: column,
-                            })
-                        }
-                    />
+                        {status === "running" && (
+                            <div className="bg-background/80 absolute inset-0 flex items-center justify-center">
+                                <div className="text-muted-foreground text-sm">
+                                    Running analysis...
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </AppShell>

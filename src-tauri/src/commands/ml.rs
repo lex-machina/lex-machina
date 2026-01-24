@@ -17,23 +17,28 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use chrono::Local;
 use lex_learning::{
     LexLearningError, Pipeline, PipelineConfig, PredictionResult, ProblemType, ProgressUpdate,
     TrainedModel, TrainingResult,
 };
-use polars::prelude::{AnyValue, DataFrame};
+use polars::prelude::{
+    AnyValue, CsvReadOptions, CsvWriter, DataFrame, DataType, FillNullStrategy,
+    SerReader, SerWriter,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_json::json;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::StoreExt;
+use std::{fs::File, path::Path};
 
 use crate::commands::settings::{SETTINGS_STORE, store_keys};
 use crate::events::{self, AppEventEmitter, MLCompletePayload, MLKernelStatus, MLProgressPayload};
 use crate::state::{
-    AppState, MAX_TRAINING_HISTORY_ENTRIES, MLConfigSnapshot, MLUIState, TrainingHistoryEntry,
-    TrainingResultSummary,
+    AppState, BatchPredictionCache, MAX_TRAINING_HISTORY_ENTRIES, MLConfigSnapshot, MLUIState,
+    TrainingHistoryEntry, TrainingResultSummary,
 };
 
 // ============================================================================
@@ -696,7 +701,7 @@ pub fn predict_batch(state: State<'_, AppState>) -> Result<BatchPredictionResult
 
     let prediction_df = model
         .predict_batch(&df)
-        .map_err(|err| map_lex_learning_error(&err).1)?;
+        .map_err(|err| format_inference_error(&err, state.ml_ui_state.read().use_processed_data))?;
 
     let row_count = prediction_df.height();
     let prediction_series = prediction_df
@@ -743,6 +748,293 @@ pub fn predict_batch(state: State<'_, AppState>) -> Result<BatchPredictionResult
         probabilities,
         row_count,
     })
+}
+
+fn format_inference_error(err: &LexLearningError, use_processed_data: bool) -> String {
+    let message = map_lex_learning_error(err).1;
+    let lower = message.to_lowercase();
+
+    if lower.contains("contains nan") || lower.contains("missing values") {
+        let hint = if use_processed_data {
+            "The model expects imputed features. Upload the processed CSV used during training, or rerun preprocessing with imputation."
+        } else {
+            "Impute missing values before running batch prediction, or use the processed CSV if the model was trained on processed data."
+        };
+        return format!("{message} {hint}");
+    }
+
+    if lower.contains("could not convert string to float")
+        || lower.contains("batch prediction failed")
+    {
+        let hint = if use_processed_data {
+            "The model was trained on processed data. Upload the processed CSV that matches the training features."
+        } else {
+            "Ensure the CSV matches the training dataset columns and types."
+        };
+        return format!("{message} {hint}");
+    }
+
+    message
+}
+
+#[tauri::command]
+pub fn predict_batch_from_csv(
+    csv_path: String,
+    state: State<'_, AppState>,
+) -> Result<BatchPredictionResult, String> {
+    if !lex_learning::is_initialized() {
+        return Err("ML runtime not initialized".to_string());
+    }
+
+    let guard = state.trained_model.read();
+    let model = guard
+        .as_ref()
+        .ok_or_else(|| "No trained model available".to_string())?;
+
+    let model_info = model
+        .get_info()
+        .map_err(|err| map_lex_learning_error(&err).1)?;
+
+    let source_path = csv_path.clone();
+    let mut df = CsvReadOptions::default()
+        .with_has_header(true)
+        .with_infer_schema_length(Some(1000))
+        .try_into_reader_with_file_path(Some(csv_path.into()))
+        .map_err(|e| format!("Failed to open CSV: {e}"))?
+        .finish()
+        .map_err(|e| format!("Failed to parse CSV: {e}"))?;
+
+    let numeric_features = numeric_features_from_training(&state, &model_info.feature_names)
+        .unwrap_or_else(|| infer_numeric_features(&df, &model_info.feature_names));
+
+    for name in &numeric_features {
+        let series = df
+            .column(name)
+            .map_err(|e| format!("Missing required feature column: {e}"))?;
+        if !is_numeric_dtype(series.dtype()) {
+            let casted = series
+                .cast(&DataType::Float64)
+                .map_err(|_| {
+                    format!(
+                        "Column '{name}' must be numeric. Use the processed CSV or retrain the model."
+                    )
+                })?;
+            df.with_column(casted)
+                .map_err(|e| format!("Failed to cast column '{name}': {e}"))?;
+        }
+    }
+
+    fill_missing_values(&mut df, &model_info.feature_names, &numeric_features)?;
+
+    let missing_features: Vec<String> = model_info
+        .feature_names
+        .iter()
+        .filter(|name| df.column(name.as_str()).is_err())
+        .cloned()
+        .collect();
+
+    if !missing_features.is_empty() {
+        return Err(format!(
+            "Missing required feature columns: {}",
+            missing_features.join(", ")
+        ));
+    }
+
+    let df = df
+        .select(&model_info.feature_names)
+        .map_err(|e| format!("Failed to select feature columns: {e}"))?;
+
+    let prediction_df = model
+        .predict_batch(&df)
+        .map_err(|err| format_inference_error(&err, state.ml_ui_state.read().use_processed_data))?;
+    let cached_df = prediction_df.clone();
+
+    let row_count = prediction_df.height();
+    let prediction_series = prediction_df
+        .column("prediction")
+        .map_err(|e| format!("Missing prediction column: {e}"))?;
+
+    let predictions = (0..row_count)
+        .map(|idx| prediction_series.get(idx))
+        .collect::<polars::prelude::PolarsResult<Vec<_>>>()
+        .map_err(|e| format!("Failed to read predictions: {e}"))?
+        .into_iter()
+        .map(any_value_to_json)
+        .collect::<Vec<_>>();
+
+    let probability_columns: Vec<_> = prediction_df
+        .get_columns()
+        .iter()
+        .filter(|col| col.name().starts_with("probability_"))
+        .map(|col| (col.name().to_string(), col.clone()))
+        .collect();
+
+    let probabilities = if probability_columns.is_empty() {
+        None
+    } else {
+        let mut rows = Vec::with_capacity(row_count);
+        for idx in 0..row_count {
+            let mut row = HashMap::new();
+            for (name, col) in &probability_columns {
+                let class_label = name.trim_start_matches("probability_");
+                let value = col
+                    .get(idx)
+                    .map_err(|e| format!("Failed to read probability: {e}"))?;
+                if let Some(prob) = any_value_to_f64(value) {
+                    row.insert(class_label.to_string(), prob);
+                }
+            }
+            rows.push(row);
+        }
+        Some(rows)
+    };
+
+    {
+        let mut cache_guard = state.ml_batch_prediction.write();
+        *cache_guard = Some(BatchPredictionCache {
+            df: cached_df,
+            source_path,
+            generated_at: Local::now().to_rfc3339(),
+        });
+    }
+
+    Ok(BatchPredictionResult {
+        predictions,
+        probabilities,
+        row_count,
+    })
+}
+
+#[tauri::command]
+pub async fn export_batch_predictions(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let (df, source_path) = {
+        let guard = state.ml_batch_prediction.read();
+        let cache = guard
+            .as_ref()
+            .ok_or_else(|| "No batch predictions available".to_string())?;
+        (cache.df.clone(), cache.source_path.clone())
+    };
+
+    let source_stem = Path::new(&source_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("predictions");
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let default_filename = format!("{}_predictions_{}.csv", source_stem, timestamp);
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("CSV Files", &["csv"])
+        .set_file_name(&default_filename)
+        .blocking_save_file();
+
+    let csv_path = match file_path {
+        Some(path) => path.to_string(),
+        None => return Err("Export cancelled by user".to_string()),
+    };
+
+    let mut df = df;
+    let file = File::create(&csv_path).map_err(|e| format!("Failed to create file: {e}"))?;
+    CsvWriter::new(file)
+        .finish(&mut df)
+        .map_err(|e| format!("Failed to write CSV: {e}"))?;
+
+    Ok(csv_path)
+}
+
+fn numeric_features_from_training(
+    state: &State<'_, AppState>,
+    feature_names: &[String],
+) -> Option<HashSet<String>> {
+    let use_processed = state
+        .training_history
+        .read()
+        .last()
+        .map(|entry| entry.config.use_processed_data)
+        .unwrap_or_else(|| state.ml_ui_state.read().use_processed_data);
+
+    let df_guard = if use_processed {
+        state.processed_dataframe.read()
+    } else {
+        state.dataframe.read()
+    };
+
+    let df = &df_guard.as_ref()?.df;
+    let mut numeric_features = HashSet::new();
+    for name in feature_names {
+        if let Ok(series) = df.column(name) {
+            if is_numeric_dtype(series.dtype()) {
+                numeric_features.insert(name.clone());
+            }
+        }
+    }
+    Some(numeric_features)
+}
+
+fn infer_numeric_features(df: &DataFrame, feature_names: &[String]) -> HashSet<String> {
+    let mut numeric_features = HashSet::new();
+    for name in feature_names {
+        if let Ok(series) = df.column(name) {
+            if is_numeric_dtype(series.dtype()) {
+                numeric_features.insert(name.clone());
+            }
+        }
+    }
+    numeric_features
+}
+
+fn fill_missing_values(
+    df: &mut DataFrame,
+    feature_names: &[String],
+    numeric_features: &HashSet<String>,
+) -> Result<(), String> {
+    for name in feature_names {
+        let series = df
+            .column(name)
+            .map_err(|e| format!("Missing required feature column: {e}"))?;
+        if series.null_count() == 0 {
+            continue;
+        }
+
+        let filled = if numeric_features.contains(name) {
+            let casted = series
+                .cast(&DataType::Float64)
+                .map_err(|e| format!("Failed to cast column '{name}': {e}"))?;
+            casted
+                .fill_null(FillNullStrategy::Mean)
+                .or_else(|_| casted.fill_null(FillNullStrategy::Zero))
+                .map_err(|e| format!("Failed to fill missing values in '{name}': {e}"))?
+        } else {
+            series
+                .fill_null(FillNullStrategy::Zero)
+                .map_err(|e| format!("Failed to fill missing values in '{name}': {e}"))?
+        };
+
+        df.with_column(filled)
+            .map_err(|e| format!("Failed to update column '{name}': {e}"))?;
+    }
+
+    Ok(())
+}
+
+fn is_numeric_dtype(dtype: &DataType) -> bool {
+    matches!(
+        dtype,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+            | DataType::Float32
+            | DataType::Float64
+    )
 }
 
 // ============================================================================

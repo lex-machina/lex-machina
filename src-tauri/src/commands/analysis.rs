@@ -6,6 +6,7 @@
 //! to keep the UI responsive.
 
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::time::Instant;
 
 use anofox_statistics::categorical::{chisq_test, cramers_v};
@@ -16,7 +17,7 @@ use anofox_statistics::parametric::anova::{one_way_anova, AnovaKind};
 use anofox_statistics::parametric::ttest::{t_test, Alternative, TTestKind};
 use chrono::{DateTime, Local, Utc};
 use lex_processing::profiler::DataProfiler;
-use lex_processing::{DataQualityAnalyzer, DatasetProfile};
+use lex_processing::{ColumnProfile, DataQualityAnalyzer, DatasetProfile};
 use normality::{
     anderson_darling, dagostino_k_squared, jarque_bera, lilliefors, shapiro_wilk,
 };
@@ -28,12 +29,15 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::events::AppEventEmitter;
 use crate::state::{
-    AnalysisCache, AnalysisColumnStats, AnalysisDataset, AnalysisResult, AnalysisSummary,
+    AnalysisCache, AnalysisColumnFilter, AnalysisColumnListItem, AnalysisColumnListResponse,
+    AnalysisColumnStats, AnalysisDataset, AnalysisResult, AnalysisSummary, AnalysisSummaryView,
     AnalysisUIState, AppState, AssociationAnalysis, BoxPlotSummary, CategoryCount,
     CategoricalColumnStats, CorrelationAnalysis, CorrelationPair, DateTimeColumnStats,
-    HeatmapMatrix, HistogramBin, MissingnessAnalysis, MissingnessColumn,
+    HeatmapMatrix, HeatmapMatrixView, HistogramBin, MissingnessAnalysis, MissingnessColumn,
     NumericCategoricalAssociation, NumericColumnStats, StatisticalTestResult, TextColumnStats,
-    TimeBin, TypeDistributionEntry,
+    TimeBin, TypeDistributionEntry, TypeDistributionEntryView, VisualizationCache,
+    VisualizationChart, VisualizationChartKind, VisualizationDashboard, VisualizationPieSlice,
+    VisualizationsUIState,
 };
 
 // ==========================================================================
@@ -45,6 +49,8 @@ use crate::state::{
 pub struct AnalysisExportResult {
     pub report_path: String,
 }
+
+const HEATMAP_MAX_COLUMNS: usize = 30;
 
 // ==========================================================================
 // TAURI COMMANDS
@@ -62,6 +68,35 @@ pub fn set_analysis_ui_state(ui_state: AnalysisUIState, state: State<'_, AppStat
     *state.analysis_ui_state.write() = ui_state;
 }
 
+/// Returns the current visualizations UI state.
+#[tauri::command]
+pub fn get_visualizations_ui_state(state: State<'_, AppState>) -> VisualizationsUIState {
+    state.visualizations_ui_state.read().clone()
+}
+
+/// Updates the visualizations UI state.
+#[tauri::command]
+pub fn set_visualizations_ui_state(
+    ui_state: VisualizationsUIState,
+    state: State<'_, AppState>,
+) {
+    *state.visualizations_ui_state.write() = ui_state;
+}
+
+/// Returns cached visualization dashboard for the selected dataset.
+#[tauri::command]
+pub fn get_visualizations_result(
+    use_processed_data: bool,
+    state: State<'_, AppState>,
+) -> Option<VisualizationDashboard> {
+    let cache = state.visualizations_results.read();
+    if use_processed_data {
+        cache.processed.clone()
+    } else {
+        cache.original.clone()
+    }
+}
+
 /// Returns cached analysis result for the selected dataset.
 #[tauri::command]
 pub fn get_analysis_result(
@@ -74,6 +109,148 @@ pub fn get_analysis_result(
     } else {
         cache.original.clone()
     }
+}
+
+/// Returns a filtered/sorted list of columns for the analysis panel.
+#[tauri::command]
+pub fn get_analysis_columns_view(
+    use_processed_data: bool,
+    filter: AnalysisColumnFilter,
+    state: State<'_, AppState>,
+) -> Option<AnalysisColumnListResponse> {
+    let cache = state.analysis_results.read();
+    let result = if use_processed_data {
+        cache.processed.as_ref()?
+    } else {
+        cache.original.as_ref()?
+    };
+    Some(build_columns_view(result, &filter))
+}
+
+/// Returns a capped heatmap view for large matrices.
+#[tauri::command]
+pub fn get_analysis_heatmap_view(
+    use_processed_data: bool,
+    kind: String,
+    max_columns: Option<usize>,
+    state: State<'_, AppState>,
+) -> Option<HeatmapMatrixView> {
+    let cache = state.analysis_results.read();
+    let result = if use_processed_data {
+        cache.processed.as_ref()?
+    } else {
+        cache.original.as_ref()?
+    };
+    let limit = max_columns.unwrap_or(HEATMAP_MAX_COLUMNS).max(1);
+
+    match kind.as_str() {
+        "pearson" => Some(build_heatmap_view(
+            &result.correlations.pearson,
+            limit,
+            HeatmapDomain::diverging(-1.0, 1.0, 0.0),
+        )),
+        "spearman" => Some(build_heatmap_view(
+            &result.correlations.spearman,
+            limit,
+            HeatmapDomain::diverging(-1.0, 1.0, 0.0),
+        )),
+        "cramers_v" => Some(build_heatmap_view(
+            &result.associations.cramers_v,
+            limit,
+            HeatmapDomain::sequential(0.0, 1.0),
+        )),
+        "chi_square" => {
+            let max_value = max_matrix_value(&result.associations.chi_square.values)
+                .unwrap_or(1.0)
+                .max(1.0);
+            Some(build_heatmap_view(
+                &result.associations.chi_square,
+                limit,
+                HeatmapDomain::sequential(0.0, max_value),
+            ))
+        }
+        "missingness" => Some(build_heatmap_view(
+            &result.missingness.co_missing_matrix,
+            limit,
+            HeatmapDomain::sequential(0.0, 100.0),
+        )),
+        _ => None,
+    }
+}
+
+/// Runs the visualization pipeline for the selected dataset.
+#[tauri::command]
+pub async fn run_visualizations(
+    use_processed_data: bool,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<VisualizationDashboard, String> {
+    let dataset = if use_processed_data {
+        AnalysisDataset::Processed
+    } else {
+        AnalysisDataset::Original
+    };
+
+    let df = {
+        let guard = if use_processed_data {
+            state.processed_dataframe.read()
+        } else {
+            state.dataframe.read()
+        };
+
+        guard
+            .as_ref()
+            .map(|loaded| loaded.df.clone())
+            .ok_or_else(|| {
+                if use_processed_data {
+                    "No processed data available".to_string()
+                } else {
+                    "No data loaded".to_string()
+                }
+            })?
+    };
+
+    app.emit_loading(true, Some("Generating visualizations..."));
+
+    let dashboard = match tauri::async_runtime::spawn_blocking(move || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            compute_visualizations(dataset, df)
+        }))
+    })
+    .await
+    {
+        Ok(Ok(Ok(result))) => result,
+        Ok(Ok(Err(err))) => {
+            app.emit_loading(false, None);
+            return Err(err);
+        }
+        Ok(Err(_panic)) => {
+            app.emit_loading(false, None);
+            return Err("Visualization engine panicked".to_string());
+        }
+        Err(err) => {
+            app.emit_loading(false, None);
+            return Err(format!("Visualization task failed: {err}"));
+        }
+    };
+
+    {
+        let mut cache = state.visualizations_results.write();
+        if use_processed_data {
+            cache.processed = Some(dashboard.clone());
+        } else {
+            cache.original = Some(dashboard.clone());
+        }
+    }
+
+    app.emit_loading(false, None);
+    Ok(dashboard)
+}
+
+/// Clears all cached visualization results.
+#[tauri::command]
+pub fn clear_visualizations_results(state: State<'_, AppState>) {
+    *state.visualizations_results.write() = VisualizationCache::default();
 }
 
 /// Clears all cached analysis results.
@@ -200,6 +377,7 @@ fn compute_analysis(dataset: AnalysisDataset, df: DataFrame) -> Result<AnalysisR
         DataQualityAnalyzer::identify_issues(&dataset_profile, &df).map_err(|e| e.to_string())?;
 
     let summary = build_summary(&df, &dataset_profile);
+    let summary_view = build_summary_view(&summary);
     let columns = build_column_stats(&df, &dataset_profile);
     let missingness = build_missingness(&df, &dataset_profile);
     let correlations = build_correlations(&df, &dataset_profile);
@@ -212,6 +390,7 @@ fn compute_analysis(dataset: AnalysisDataset, df: DataFrame) -> Result<AnalysisR
         generated_at: Local::now().to_rfc3339(),
         duration_ms,
         summary,
+        summary_view,
         dataset_profile,
         columns,
         missingness,
@@ -219,6 +398,259 @@ fn compute_analysis(dataset: AnalysisDataset, df: DataFrame) -> Result<AnalysisR
         associations,
         quality_issues,
     })
+}
+
+fn compute_visualizations(
+    dataset: AnalysisDataset,
+    df: DataFrame,
+) -> Result<VisualizationDashboard, String> {
+    let dataset_profile = DataProfiler::profile_dataset(&df).map_err(|e| e.to_string())?;
+    let columns = build_column_stats(&df, &dataset_profile);
+    let generated_at = Local::now();
+    let seed = generated_at
+        .timestamp_nanos_opt()
+        .unwrap_or_else(|| generated_at.timestamp()) as u64;
+    let charts = build_visualization_charts(&columns, seed);
+
+    Ok(VisualizationDashboard {
+        dataset,
+        generated_at: generated_at.to_rfc3339(),
+        charts,
+    })
+}
+
+fn build_visualization_charts(
+    columns: &[AnalysisColumnStats],
+    seed: u64,
+) -> Vec<VisualizationChart> {
+    columns
+        .iter()
+        .filter_map(|column| {
+            let inferred_type = column.profile.inferred_type.clone();
+            let name = column.profile.name.clone();
+            let unique_count = column.profile.unique_count;
+            let null_percentage = column.profile.null_percentage;
+            let is_binary_numeric =
+                inferred_type == "numeric" && unique_count > 0 && unique_count <= 2;
+            let chart_inferred_type = if inferred_type == "string" && column.categorical.is_some() {
+                "categorical (string)".to_string()
+            } else if is_binary_numeric {
+                "binary (numeric)".to_string()
+            } else {
+                inferred_type.clone()
+            };
+            match inferred_type.as_str() {
+                "numeric" if is_binary_numeric => column.categorical.as_ref().map(|stats| {
+                    let available_kinds = available_categorical_kinds(unique_count);
+                    VisualizationChart {
+                        title: format!("{name} categories"),
+                        column: name,
+                        inferred_type: chart_inferred_type,
+                        unique_count,
+                        null_percentage,
+                        kind: pick_random_kind(
+                            &available_kinds,
+                            &column.profile.name,
+                            seed,
+                        ),
+                        available_kinds,
+                        histogram: None,
+                        categories: Some(stats.top_values.clone()),
+                        time_bins: None,
+                        box_plot: None,
+                        pie_slices: Some(build_pie_slices(&stats.top_values)),
+                    }
+                }),
+                "numeric" => column.numeric.as_ref().map(|stats| VisualizationChart {
+                    title: format!("{name} distribution"),
+                    column: name,
+                    inferred_type: chart_inferred_type,
+                    unique_count,
+                    null_percentage,
+                    kind: pick_random_kind(
+                        &[
+                            VisualizationChartKind::Histogram,
+                            VisualizationChartKind::Line,
+                        ],
+                        &column.profile.name,
+                        seed,
+                    ),
+                    available_kinds: vec![
+                        VisualizationChartKind::Histogram,
+                        VisualizationChartKind::Line,
+                    ],
+                    histogram: Some(stats.histogram.clone()),
+                    categories: None,
+                    time_bins: None,
+                    box_plot: Some(stats.box_plot.clone()),
+                    pie_slices: None,
+                }),
+                "categorical" | "binary" | "boolean" => {
+                    column.categorical.as_ref().map(|stats| VisualizationChart {
+                        title: format!("{name} categories"),
+                        column: name,
+                        inferred_type: chart_inferred_type,
+                        unique_count,
+                        null_percentage,
+                        kind: pick_random_kind(
+                            &available_categorical_kinds(unique_count),
+                            &column.profile.name,
+                            seed,
+                        ),
+                        available_kinds: available_categorical_kinds(unique_count),
+                        histogram: None,
+                        categories: Some(stats.top_values.clone()),
+                        time_bins: None,
+                        box_plot: None,
+                        pie_slices: Some(build_pie_slices(&stats.top_values)),
+                    })
+                }
+                "string" => {
+                    if let Some(categorical) = column.categorical.as_ref() {
+                        let length_histogram = column
+                            .text
+                            .as_ref()
+                            .map(|stats| stats.length_histogram.clone())
+                            .unwrap_or_default();
+                        let has_length = !length_histogram.is_empty();
+                        let mut available_kinds = available_categorical_kinds(unique_count);
+                        if has_length {
+                            available_kinds.push(VisualizationChartKind::Histogram);
+                            available_kinds.push(VisualizationChartKind::Line);
+                        }
+                        let base_kinds = available_categorical_kinds(unique_count);
+
+                        Some(VisualizationChart {
+                            title: format!("{name} categories"),
+                            column: name,
+                            inferred_type: chart_inferred_type,
+                            unique_count,
+                            null_percentage,
+                            kind: pick_random_kind(
+                                &base_kinds,
+                                &column.profile.name,
+                                seed,
+                            ),
+                            available_kinds,
+                            histogram: if has_length {
+                                Some(length_histogram)
+                            } else {
+                                None
+                            },
+                            categories: Some(categorical.top_values.clone()),
+                            time_bins: None,
+                            box_plot: None,
+                            pie_slices: Some(build_pie_slices(&categorical.top_values)),
+                        })
+                    } else if let Some(stats) = column.text.as_ref() {
+                        Some(VisualizationChart {
+                            title: format!("{name} length"),
+                            column: name,
+                            inferred_type: chart_inferred_type,
+                            unique_count,
+                            null_percentage,
+                            kind: pick_random_kind(
+                                &[
+                                    VisualizationChartKind::Histogram,
+                                    VisualizationChartKind::Line,
+                                ],
+                                &column.profile.name,
+                                seed,
+                            ),
+                            available_kinds: vec![
+                                VisualizationChartKind::Histogram,
+                                VisualizationChartKind::Line,
+                            ],
+                            histogram: Some(stats.length_histogram.clone()),
+                            categories: None,
+                            time_bins: None,
+                            box_plot: None,
+                            pie_slices: None,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "datetime" => column.datetime.as_ref().map(|stats| VisualizationChart {
+                    title: format!("{name} over time"),
+                    column: name,
+                    inferred_type: chart_inferred_type,
+                    unique_count,
+                    null_percentage,
+                    kind: pick_random_kind(
+                        &[
+                            VisualizationChartKind::Time,
+                            VisualizationChartKind::Line,
+                        ],
+                        &column.profile.name,
+                        seed,
+                    ),
+                    available_kinds: vec![
+                        VisualizationChartKind::Time,
+                        VisualizationChartKind::Line,
+                    ],
+                    histogram: None,
+                    categories: None,
+                    time_bins: Some(stats.time_bins.clone()),
+                    box_plot: None,
+                    pie_slices: None,
+                }),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+fn build_pie_slices(categories: &[CategoryCount]) -> Vec<VisualizationPieSlice> {
+    let total: usize = categories.iter().map(|entry| entry.count).sum();
+    if total == 0 {
+        return Vec::new();
+    }
+
+    let mut start_angle = 0.0;
+    categories
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let share = entry.count as f64 / total as f64;
+            let angle = share * std::f64::consts::TAU;
+            let end_angle = start_angle + angle;
+            let slice = VisualizationPieSlice {
+                label: entry.value.clone(),
+                value: entry.count,
+                percentage: entry.percentage,
+                start_angle,
+                end_angle,
+                color_index: index,
+            };
+            start_angle = end_angle;
+            slice
+        })
+        .collect()
+}
+
+fn available_categorical_kinds(unique_count: usize) -> Vec<VisualizationChartKind> {
+    let mut kinds = vec![VisualizationChartKind::Bar, VisualizationChartKind::Column];
+    if unique_count <= 12 {
+        kinds.push(VisualizationChartKind::Pie);
+    }
+    kinds
+}
+
+fn pick_random_kind(
+    available: &[VisualizationChartKind],
+    column: &str,
+    seed: u64,
+) -> VisualizationChartKind {
+    if available.is_empty() {
+        return VisualizationChartKind::Histogram;
+    }
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    column.hash(&mut hasher);
+    let hash = hasher.finish();
+    let index = ((hash ^ seed) % available.len() as u64) as usize;
+    available[index]
 }
 
 fn build_summary(df: &DataFrame, profile: &DatasetProfile) -> AnalysisSummary {
@@ -265,7 +697,84 @@ fn build_summary(df: &DataFrame, profile: &DatasetProfile) -> AnalysisSummary {
     }
 }
 
+fn build_summary_view(summary: &AnalysisSummary) -> AnalysisSummaryView {
+    let duplicates = format!(
+        "{} ({})",
+        format_number(summary.duplicate_count as u64),
+        format_percentage(summary.duplicate_percentage, 2),
+    );
+    let missing_cells = format!(
+        "{} ({})",
+        format_number(summary.total_missing_cells as u64),
+        format_percentage(summary.total_missing_percentage, 2),
+    );
+
+    let type_distribution = summary
+        .type_distribution
+        .iter()
+        .map(|entry| TypeDistributionEntryView {
+            dtype: entry.dtype.clone(),
+            count: format_number(entry.count as u64),
+            percentage: format_percentage(entry.percentage, 1),
+        })
+        .collect();
+
+    AnalysisSummaryView {
+        rows: format_number(summary.rows as u64),
+        columns: format_number(summary.columns as u64),
+        memory: format_bytes(summary.memory_bytes),
+        duplicates,
+        missing_cells,
+        type_distribution,
+    }
+}
+
+fn format_number(value: u64) -> String {
+    let digits = value.to_string();
+    let mut output = String::with_capacity(digits.len() + digits.len() / 3);
+    let mut count = 0;
+
+    for ch in digits.chars().rev() {
+        if count == 3 {
+            output.push(',');
+            count = 0;
+        }
+        output.push(ch);
+        count += 1;
+    }
+
+    output.chars().rev().collect()
+}
+
+fn format_percentage(value: f64, decimals: usize) -> String {
+    format!("{value:.decimals$}%", value = value, decimals = decimals)
+}
+
+fn format_bytes(bytes: u64) -> String {
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+
+    let sizes = ["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut index = 0;
+
+    while size >= 1024.0 && index < sizes.len() - 1 {
+        size /= 1024.0;
+        index += 1;
+    }
+
+    let mut formatted = format!("{size:.1}");
+    if formatted.ends_with(".0") {
+        formatted.truncate(formatted.len() - 2);
+    }
+
+    format!("{formatted} {}", sizes[index])
+}
+
 fn build_column_stats(df: &DataFrame, profile: &DatasetProfile) -> Vec<AnalysisColumnStats> {
+    let row_count = df.height();
+
     profile
         .column_profiles
         .iter()
@@ -273,6 +782,9 @@ fn build_column_stats(df: &DataFrame, profile: &DatasetProfile) -> Vec<AnalysisC
             let series = df.column(&column.name).ok()?;
             let series = series.as_materialized_series();
             let inferred_type = column.inferred_type.as_str();
+            let is_low_cardinality_string =
+                inferred_type == "string" && is_low_cardinality_string(column, row_count);
+            let is_binary_numeric = inferred_type == "numeric" && column.unique_count <= 2;
 
             let numeric = if inferred_type == "numeric" {
                 compute_numeric_stats(series)
@@ -283,6 +795,8 @@ fn build_column_stats(df: &DataFrame, profile: &DatasetProfile) -> Vec<AnalysisC
             let categorical = if inferred_type == "categorical"
                 || inferred_type == "binary"
                 || inferred_type == "boolean"
+                || is_low_cardinality_string
+                || is_binary_numeric
             {
                 compute_categorical_stats(series)
             } else {
@@ -310,6 +824,20 @@ fn build_column_stats(df: &DataFrame, profile: &DatasetProfile) -> Vec<AnalysisC
             })
         })
         .collect()
+}
+
+fn is_low_cardinality_string(column: &ColumnProfile, row_count: usize) -> bool {
+    if row_count == 0 {
+        return false;
+    }
+
+    let non_null = row_count.saturating_sub(column.null_count);
+    if non_null == 0 {
+        return false;
+    }
+
+    let unique_ratio = column.unique_count as f64 / non_null as f64;
+    column.unique_count <= 20 || unique_ratio <= 0.1
 }
 
 fn compute_numeric_stats(series: &Series) -> Option<NumericColumnStats> {
@@ -380,7 +908,7 @@ fn compute_numeric_stats(series: &Series) -> Option<NumericColumnStats> {
         0
     };
 
-    let histogram = build_histogram(&sorted, 24);
+    let histogram = build_histogram(&sorted, 32);
     let box_plot = BoxPlotSummary {
         min,
         q1,
@@ -531,7 +1059,7 @@ fn compute_text_stats(series: &Series) -> Option<TextColumnStats> {
         0.0
     };
 
-    let length_histogram = build_histogram(&lengths, 20);
+    let length_histogram = build_histogram(&lengths, 24);
 
     Some(TextColumnStats {
         min_length,
@@ -1045,7 +1573,7 @@ fn build_co_missing_matrix(df: &DataFrame, profile: &DatasetProfile) -> HeatmapM
     }
 }
 
-fn build_histogram(values: &[f64], bins: usize) -> Vec<HistogramBin> {
+fn build_histogram(values: &[f64], max_bins: usize) -> Vec<HistogramBin> {
     if values.is_empty() {
         return Vec::new();
     }
@@ -1060,7 +1588,7 @@ fn build_histogram(values: &[f64], bins: usize) -> Vec<HistogramBin> {
         }];
     }
 
-    let bin_count = bins.max(5);
+    let bin_count = select_bin_count(values, max_bins);
     let width = (max - min) / bin_count as f64;
     let mut counts = vec![0usize; bin_count];
 
@@ -1081,6 +1609,39 @@ fn build_histogram(values: &[f64], bins: usize) -> Vec<HistogramBin> {
             count,
         })
         .collect()
+}
+
+fn select_bin_count(values: &[f64], max_bins: usize) -> usize {
+    let n = values.len();
+    if n <= 1 {
+        return 1;
+    }
+
+    let min = values.first().copied().unwrap_or(0.0);
+    let max = values.last().copied().unwrap_or(min);
+    if (max - min).abs() < f64::EPSILON {
+        return 1;
+    }
+
+    let n_f64 = n as f64;
+    let sturges = n_f64.log2().ceil() as usize + 1;
+    let q1 = quantile_sorted(values, 0.25);
+    let q3 = quantile_sorted(values, 0.75);
+    let iqr = (q3 - q1).abs();
+    let fd_bins = if iqr > 0.0 {
+        let bin_width = 2.0 * iqr / n_f64.powf(1.0 / 3.0);
+        if bin_width > 0.0 {
+            ((max - min) / bin_width).ceil() as usize
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    let target = if fd_bins > 0 { fd_bins } else { sturges };
+    let upper = max_bins.max(5).min(60);
+    target.clamp(5, upper)
 }
 
 fn quantile_sorted(values: &[f64], quantile: f64) -> f64 {
@@ -1165,6 +1726,176 @@ fn to_test_result(test: &str, statistic: f64, p_value: f64) -> StatisticalTestRe
         effect_size: None,
         notes: None,
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct HeatmapDomain {
+    min: f64,
+    max: f64,
+    center: Option<f64>,
+}
+
+impl HeatmapDomain {
+    fn sequential(min: f64, max: f64) -> Self {
+        Self {
+            min,
+            max,
+            center: None,
+        }
+    }
+
+    fn diverging(min: f64, max: f64, center: f64) -> Self {
+        Self {
+            min,
+            max,
+            center: Some(center),
+        }
+    }
+}
+
+fn build_columns_view(
+    result: &AnalysisResult,
+    filter: &AnalysisColumnFilter,
+) -> AnalysisColumnListResponse {
+    let total = result.columns.len();
+    let search = filter
+        .search
+        .as_ref()
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty());
+    let mut type_filters: HashSet<String> = filter
+        .inferred_types
+        .iter()
+        .map(|value| value.to_lowercase())
+        .collect();
+
+    if type_filters.contains("all") {
+        type_filters.clear();
+    }
+
+    let mut columns: Vec<AnalysisColumnListItem> = result
+        .columns
+        .iter()
+        .filter(|column| {
+            let profile = &column.profile;
+            if let Some(search) = &search {
+                let name = profile.name.to_lowercase();
+                if !name.contains(search) {
+                    return false;
+                }
+            }
+
+            if !type_filters.is_empty()
+                && !type_filters.contains(&profile.inferred_type.to_lowercase())
+            {
+                return false;
+            }
+
+            true
+        })
+        .map(|column| {
+            let profile = &column.profile;
+            AnalysisColumnListItem {
+                name: profile.name.clone(),
+                dtype: profile.dtype.clone(),
+                inferred_type: profile.inferred_type.clone(),
+                inferred_role: profile.inferred_role.clone(),
+                unique_count: profile.unique_count,
+                null_percentage: profile.null_percentage,
+            }
+        })
+        .collect();
+
+    let sort_by = filter.sort_by.as_str();
+    let sort_desc = filter.sort_direction.to_lowercase() == "desc";
+
+    columns.sort_by(|a, b| {
+        let ordering = match sort_by {
+            "nulls" => a
+                .null_percentage
+                .partial_cmp(&b.null_percentage)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            "cardinality" => a.unique_count.cmp(&b.unique_count),
+            "type" => a.inferred_type.cmp(&b.inferred_type),
+            _ => a.name.cmp(&b.name),
+        };
+
+        if sort_desc {
+            ordering.reverse()
+        } else {
+            ordering
+        }
+    });
+
+    AnalysisColumnListResponse {
+        total,
+        filtered: columns.len(),
+        columns,
+    }
+}
+
+fn build_heatmap_view(
+    matrix: &HeatmapMatrix,
+    limit: usize,
+    domain: HeatmapDomain,
+) -> HeatmapMatrixView {
+    let total = matrix.x_labels.len().min(matrix.y_labels.len());
+    let mut indices: Vec<usize> = (0..total).collect();
+    indices.sort_by(|a, b| matrix.x_labels[*a].cmp(&matrix.x_labels[*b]));
+    if indices.len() > limit {
+        indices.truncate(limit);
+    }
+
+    let x_labels: Vec<String> = indices
+        .iter()
+        .map(|&index| matrix.x_labels[index].clone())
+        .collect();
+    let y_labels: Vec<String> = indices
+        .iter()
+        .map(|&index| matrix.y_labels[index].clone())
+        .collect();
+
+    let values = indices
+        .iter()
+        .map(|&row| {
+            indices
+                .iter()
+                .map(|&col| matrix.values[row][col])
+                .collect::<Vec<f64>>()
+        })
+        .collect::<Vec<Vec<f64>>>();
+
+    let p_values = matrix.p_values.as_ref().map(|p_values| {
+        indices
+            .iter()
+            .map(|&row| {
+                indices
+                    .iter()
+                    .map(|&col| p_values[row][col])
+                    .collect::<Vec<f64>>()
+            })
+            .collect::<Vec<Vec<f64>>>()
+    });
+
+    HeatmapMatrixView {
+        x_labels,
+        y_labels,
+        values,
+        p_values,
+        min: domain.min,
+        max: domain.max,
+        center: domain.center,
+        truncated: total > limit,
+        total_columns: total,
+    }
+}
+
+fn max_matrix_value(values: &[Vec<f64>]) -> Option<f64> {
+    values
+        .iter()
+        .flat_map(|row| row.iter())
+        .cloned()
+        .reduce(f64::max)
 }
 
 fn brown_forsythe_test(groups: &[Vec<f64>]) -> Option<StatisticalTestResult> {

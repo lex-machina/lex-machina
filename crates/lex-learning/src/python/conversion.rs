@@ -430,12 +430,22 @@ pub fn extract_training_result(
         ("summary", "summary_plot"),
         ("beeswarm", "beeswarm_plot"),
         ("feature_importance", "feature_importance_plot"),
+        ("waterfall", "waterfall_plot"),
+        ("decision", "decision_plot"),
     ] {
         if let Ok(plot) = explainability.getattr(attr)
             && !plot.is_none()
             && let Ok(bytes) = plot.extract::<Vec<u8>>()
         {
             shap_plots.insert(name.to_string(), bytes);
+        }
+    }
+
+    if let Ok(dep_plots) = explainability.getattr("dependence_plots") {
+        if let Ok(map) = dep_plots.extract::<HashMap<String, Vec<u8>>>() {
+            for (name, bytes) in map {
+                shap_plots.insert(format!("dependence:{name}"), bytes);
+            }
         }
     }
 

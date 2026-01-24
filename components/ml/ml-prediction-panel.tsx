@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Braces, Wand2 } from "lucide-react";
+import { Braces, FileUp, Wand2 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 
 import type {
     BatchPredictionResult,
@@ -9,6 +10,7 @@ import type {
     PredictionResult,
 } from "@/types";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +19,7 @@ interface MLPredictionPanelProps {
     onPredictSingle: (
         payload: Record<string, unknown>,
     ) => Promise<PredictionResult>;
-    onPredictBatch: () => Promise<BatchPredictionResult>;
+    onPredictBatchFromCsv: (path: string) => Promise<BatchPredictionResult>;
     disabled?: boolean;
 }
 
@@ -56,7 +58,7 @@ function PanelTab({
 export function MLPredictionPanel({
     columns,
     onPredictSingle,
-    onPredictBatch,
+    onPredictBatchFromCsv,
     disabled = false,
 }: MLPredictionPanelProps) {
     const [mode, setMode] = useState<"single" | "batch">("single");
@@ -68,6 +70,7 @@ export function MLPredictionPanel({
     );
     const [batchResult, setBatchResult] =
         useState<BatchPredictionResult | null>(null);
+    const [batchFileName, setBatchFileName] = useState<string | null>(null);
 
     const columnNames = useMemo(
         () => columns.map((col) => col.name),
@@ -88,9 +91,32 @@ export function MLPredictionPanel({
         setSingleResult(result);
     };
 
-    const handlePredictBatch = async () => {
-        const result = await onPredictBatch();
-        setBatchResult(result);
+    const handleBatchUpload = async () => {
+        try {
+            const filePath = await invoke<string | null>("open_file_dialog");
+            if (!filePath) {
+                return;
+            }
+            const result = await onPredictBatchFromCsv(filePath);
+            setBatchResult(result);
+            const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
+            setBatchFileName(fileName);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            toast.error(message);
+        }
+    };
+
+    const handleExportBatch = async () => {
+        try {
+            const csvPath = await invoke<string>("export_batch_predictions");
+            toast.success(`Exported predictions to ${csvPath}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message !== "Export cancelled by user") {
+                toast.error(message);
+            }
+        }
     };
 
     return (
@@ -113,8 +139,7 @@ export function MLPredictionPanel({
             {mode === "single" ? (
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">
                     <div className="flex flex-col gap-3">
-                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                            <Wand2 className="h-3.5 w-3.5" />
+                        <div className="text-muted-foreground text-xs">
                             Single prediction
                         </div>
                         <div className="flex gap-2">
@@ -212,11 +237,21 @@ export function MLPredictionPanel({
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={handlePredictBatch}
+                            onClick={handleBatchUpload}
                             disabled={disabled}
                         >
-                            Predict batch
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Upload CSV for batch
                         </Button>
+                        <div className="text-muted-foreground text-xs">
+                            CSV must match the training feature columns and
+                            types.
+                        </div>
+                        {batchFileName && (
+                            <div className="text-muted-foreground text-xs">
+                                File: {batchFileName}
+                            </div>
+                        )}
                         {batchResult && (
                             <div className="bg-muted/30 rounded-md border p-3 text-xs">
                                 <div className="text-muted-foreground">
@@ -232,6 +267,16 @@ export function MLPredictionPanel({
                                         "..."}
                                 </div>
                             </div>
+                        )}
+                        {batchResult && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleExportBatch}
+                                disabled={disabled}
+                            >
+                                Export predictions
+                            </Button>
                         )}
                     </div>
                 </div>

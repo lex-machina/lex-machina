@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { formatBytes, formatNumber } from "@/lib/utils";
 import type { AnalysisResult } from "@/types";
 
 interface AnalysisOverviewProps {
@@ -9,7 +8,7 @@ interface AnalysisOverviewProps {
 }
 
 const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
-    const { summary, dataset_profile } = analysis;
+    const { summary_view, dataset_profile } = analysis;
 
     return (
         <div className="grid h-full grid-cols-2 gap-3">
@@ -19,20 +18,18 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                         <div>
                             <dt className="text-muted-foreground">Rows</dt>
-                            <dd className="font-medium">
-                                {formatNumber(summary.rows)}
-                            </dd>
+                            <dd className="font-medium">{summary_view.rows}</dd>
                         </div>
                         <div>
                             <dt className="text-muted-foreground">Columns</dt>
                             <dd className="font-medium">
-                                {formatNumber(summary.columns)}
+                                {summary_view.columns}
                             </dd>
                         </div>
                         <div>
                             <dt className="text-muted-foreground">Memory</dt>
                             <dd className="font-medium">
-                                {formatBytes(summary.memory_bytes)}
+                                {summary_view.memory}
                             </dd>
                         </div>
                         <div>
@@ -40,8 +37,7 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                                 Duplicates
                             </dt>
                             <dd className="font-medium">
-                                {formatNumber(summary.duplicate_count)} (
-                                {summary.duplicate_percentage.toFixed(2)}%)
+                                {summary_view.duplicates}
                             </dd>
                         </div>
                         <div>
@@ -49,8 +45,7 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                                 Missing Cells
                             </dt>
                             <dd className="font-medium">
-                                {formatNumber(summary.total_missing_cells)} (
-                                {summary.total_missing_percentage.toFixed(2)}%)
+                                {summary_view.missing_cells}
                             </dd>
                         </div>
                         <div>
@@ -69,7 +64,7 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                 <CardHeader title="Type Distribution" />
                 <CardContent padded>
                     <div className="space-y-2 text-sm">
-                        {summary.type_distribution.map((entry) => (
+                        {summary_view.type_distribution.map((entry) => (
                             <div
                                 key={entry.dtype}
                                 className="flex items-center justify-between"
@@ -78,8 +73,7 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                                     {entry.dtype}
                                 </span>
                                 <span className="font-medium">
-                                    {formatNumber(entry.count)} (
-                                    {entry.percentage.toFixed(1)}%)
+                                    {entry.count} ({entry.percentage})
                                 </span>
                             </div>
                         ))}
@@ -130,11 +124,11 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                                 key={key}
                                 className="flex items-center justify-between"
                             >
-                                <dt className="text-muted-foreground">{key}</dt>
+                                <dt className="text-muted-foreground">
+                                    {formatComplexityLabel(key)}
+                                </dt>
                                 <dd className="font-medium">
-                                    {typeof value === "string"
-                                        ? value
-                                        : JSON.stringify(value)}
+                                    {formatComplexityValue(value)}
                                 </dd>
                             </div>
                         ))}
@@ -143,6 +137,28 @@ const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
             </Card>
         </div>
     );
+};
+
+const formatComplexityLabel = (label: string) =>
+    label
+        .split("_")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+
+const formatComplexityValue = (value: unknown) => {
+    if (value === null || value === undefined) {
+        return "—";
+    }
+    if (typeof value === "boolean") {
+        return value ? "Yes" : "No";
+    }
+    if (typeof value === "number") {
+        return value.toFixed(2);
+    }
+    if (typeof value === "string") {
+        return value;
+    }
+    return JSON.stringify(value);
 };
 
 export default AnalysisOverview;

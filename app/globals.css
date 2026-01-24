@@ -142,3 +142,31 @@ body {
 .animate-progress-indeterminate {
     animation: progress-indeterminate 1.5s ease-in-out infinite;
 }
+
+svg[class^="plot-"] {
+    --plot-background: var(--popover) !important;
+    color: var(--foreground) !important;
+}
+
+html.dark svg[class^="plot-"],
+body.dark svg[class^="plot-"],
+.dark svg[class^="plot-"] {
+    --plot-background: var(--popover) !important;
+    color: var(--popover-foreground) !important;
+}
+
+.plot-tooltip table {
+    border-collapse: collapse;
+}
+
+.plot-tooltip th {
+    padding: 0 8px 4px 0;
+    text-align: left;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+
+.plot-tooltip td {
+    padding: 0 0 4px;
+    text-align: right;
+}

@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import { invoke } from "@tauri-apps/api/core";
 import { useFileState } from "@/lib/hooks/use-file-state";
 import { useAppStatus } from "@/lib/hooks/use-app-status";
 import { usePreprocessing } from "@/lib/hooks/use-preprocessing";
-import { formatBytes, formatNumber } from "@/lib/utils";
+import type { AnalysisResult, AnalysisUIState } from "@/types";
+import { formatBytes, formatDuration, formatNumber } from "@/lib/utils";
 
 /** Application version - displayed in status bar */
 const APP_VERSION = "v0.1.0";
@@ -27,6 +30,95 @@ const StatusBar = () => {
     const { fileInfo } = useFileState();
     const { isLoading, loadingMessage } = useAppStatus();
     const { status: preprocessingStatus } = usePreprocessing();
+    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
+        null,
+    );
+    const [analysisUiState, setAnalysisUiState] =
+        useState<AnalysisUIState | null>(null);
+
+    const isAnalysisPage = pathname === "/analysis";
+    const isAnalysisLoading =
+        isAnalysisPage &&
+        isLoading &&
+        Boolean(loadingMessage?.toLowerCase().includes("analysis"));
+
+    const analysisTabLabel = useMemo(() => {
+        if (!analysisUiState) {
+            return "Overview";
+        }
+        const labels: Record<string, string> = {
+            overview: "Overview",
+            columns: "Columns",
+            missingness: "Missingness",
+            correlations: "Correlations",
+            associations: "Associations",
+            quality: "Quality",
+        };
+        return labels[analysisUiState.active_tab] ?? "Overview";
+    }, [analysisUiState]);
+
+    useEffect(() => {
+        if (!isAnalysisPage) {
+            setAnalysisResult(null);
+            setAnalysisUiState(null);
+            return;
+        }
+
+        let isActive = true;
+
+        const loadUiState = async () => {
+            try {
+                const state = await invoke<AnalysisUIState>(
+                    "get_analysis_ui_state",
+                );
+                if (isActive) {
+                    setAnalysisUiState(state);
+                }
+            } catch (err) {
+                if (isActive) {
+                    setAnalysisUiState(null);
+                }
+            }
+        };
+
+        loadUiState();
+        const intervalId = setInterval(loadUiState, 1200);
+
+        return () => {
+            isActive = false;
+            clearInterval(intervalId);
+        };
+    }, [isAnalysisPage]);
+
+    useEffect(() => {
+        if (!isAnalysisPage || !analysisUiState) {
+            return;
+        }
+
+        if (isAnalysisLoading) {
+            return;
+        }
+
+        let isActive = true;
+
+        invoke<AnalysisResult | null>("get_analysis_result", {
+            useProcessedData: analysisUiState.use_processed_data,
+        })
+            .then((result) => {
+                if (isActive) {
+                    setAnalysisResult(result);
+                }
+            })
+            .catch(() => {
+                if (isActive) {
+                    setAnalysisResult(null);
+                }
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [isAnalysisPage, analysisUiState, isAnalysisLoading]);
 
     /**
      * Renders the left content based on current page.
@@ -82,8 +174,66 @@ const StatusBar = () => {
                 );
 
             case "/analysis":
+                if (!analysisUiState) {
+                    return <span>Analysis</span>;
+                }
+
+                return (
+                    <>
+                        <span className="text-foreground font-medium">
+                            {analysisUiState.use_processed_data
+                                ? "Processed"
+                                : "Original"}{" "}
+                            dataset
+                        </span>
+                        <span className="text-muted-foreground/60">|</span>
+                        <span>Tab: {analysisTabLabel}</span>
+                        {analysisResult?.generated_at && (
+                            <>
+                                <span className="text-muted-foreground/60">
+                                    |
+                                </span>
+                                <span>
+                                    Last run:{" "}
+                                    {new Date(
+                                        analysisResult.generated_at,
+                                    ).toLocaleString()}
+                                </span>
+                            </>
+                        )}
+                        {analysisResult?.duration_ms !== undefined && (
+                            <>
+                                <span className="text-muted-foreground/60">
+                                    |
+                                </span>
+                                <span>
+                                    Runtime:{" "}
+                                    {formatDuration(analysisResult.duration_ms)}
+                                </span>
+                            </>
+                        )}
+                        <span className="text-muted-foreground/60">|</span>
+                        <span className="tracking-wide uppercase">
+                            {isAnalysisLoading && "Running"}
+                            {!isAnalysisLoading && analysisResult && "Complete"}
+                            {!isAnalysisLoading && !analysisResult && "Idle"}
+                        </span>
+                    </>
+                );
+
             case "/ml":
-                // Analysis/ML: File info or no file
+                // ML: File info or no file
+                return fileInfo ? (
+                    <>
+                        <span>{fileInfo.name}</span>
+                        <span className="text-muted-foreground/60">|</span>
+                        <span>{formatNumber(fileInfo.row_count)} rows</span>
+                    </>
+                ) : (
+                    <span>No file loaded</span>
+                );
+
+            case "/visualizations":
                 return fileInfo ? (
                     <>
                         <span>{fileInfo.name}</span>
@@ -152,9 +302,12 @@ const StatusBar = () => {
                 );
 
             case "/analysis":
+                return <span>{APP_VERSION}</span>;
+
+            case "/visualizations":
                 return (
                     <>
-                        <span>Analysis</span>
+                        <span>Visualizations</span>
                         <span className="text-muted-foreground/60">|</span>
                         <span>{APP_VERSION}</span>
                     </>

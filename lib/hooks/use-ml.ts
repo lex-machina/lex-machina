@@ -48,6 +48,7 @@ export interface MLActions {
         instance: Record<string, unknown>,
     ) => Promise<PredictionResult>;
     predictBatch: () => Promise<BatchPredictionResult>;
+    predictBatchFromCsv: (path: string) => Promise<BatchPredictionResult>;
     getHistory: () => Promise<TrainingHistoryEntry[]>;
     clearHistory: () => Promise<void>;
     refreshKernelStatus: () => Promise<MLKernelStatus>;
@@ -238,6 +239,12 @@ export function useML(): UseMLReturn {
         return await invoke<BatchPredictionResult>("predict_batch");
     }, []);
 
+    const predictBatchFromCsv = useCallback(async (path: string) => {
+        return await invoke<BatchPredictionResult>("predict_batch_from_csv", {
+            path,
+        });
+    }, []);
+
     const getHistory = useCallback(async () => {
         const entries = await invoke<TrainingHistoryEntry[]>(
             "get_training_history",
@@ -286,6 +293,7 @@ export function useML(): UseMLReturn {
         getSHAPPlot,
         predictSingle,
         predictBatch,
+        predictBatchFromCsv,
         getHistory,
         clearHistory,
         refreshKernelStatus,

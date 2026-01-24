@@ -2,47 +2,39 @@
 
 import { Button } from "@/components/ui/button";
 import Toggle from "@/components/ui/toggle";
-import { formatBytes, formatDuration, formatNumber } from "@/lib/utils";
+import { formatBytes, formatNumber } from "@/lib/utils";
 
-import type { AnalysisStatus } from "@/lib/hooks/use-analysis";
+import type { VisualizationsStatus } from "@/lib/hooks/use-visualizations";
 
-interface AnalysisSidebarProps {
+interface VisualizationsSidebarProps {
     datasetName: string | null;
     rows: number;
     columns: number;
     memoryBytes: number | null;
     datasetLabel: string;
     generatedAt: string | null;
-    durationMs: number | null;
     useProcessedData: boolean;
     hasProcessedData: boolean;
-    status: AnalysisStatus;
+    status: VisualizationsStatus;
     hasResult: boolean;
-    exportMessage: string | null;
-    exportStatus: "success" | "error" | null;
     onToggleDataset: (useProcessed: boolean) => void;
     onRun: () => void;
-    onExport: () => void;
 }
 
-const AnalysisSidebar = ({
+const VisualizationsSidebar = ({
     datasetName,
     rows,
     columns,
     memoryBytes,
     datasetLabel,
     generatedAt,
-    durationMs,
     useProcessedData,
     hasProcessedData,
     status,
     hasResult,
-    exportMessage,
-    exportStatus,
     onToggleDataset,
     onRun,
-    onExport,
-}: AnalysisSidebarProps) => {
+}: VisualizationsSidebarProps) => {
     const isRunning = status === "running";
 
     return (
@@ -84,14 +76,14 @@ const AnalysisSidebar = ({
                     </dl>
                 ) : (
                     <p className="text-muted-foreground text-sm">
-                        Load a dataset to begin analysis.
+                        Load a dataset to begin visualizations.
                     </p>
                 )}
             </section>
 
             <section>
                 <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase">
-                    Analysis Scope
+                    Visualization Scope
                 </h2>
                 <Toggle
                     pressed={useProcessedData}
@@ -99,7 +91,7 @@ const AnalysisSidebar = ({
                     label="Use processed data"
                     description={
                         hasProcessedData
-                            ? "Analyze the cleaned dataset"
+                            ? "Build charts from the cleaned dataset"
                             : "Run preprocessing to enable"
                     }
                     disabled={!hasProcessedData}
@@ -108,26 +100,10 @@ const AnalysisSidebar = ({
 
             <section className="flex flex-col gap-2">
                 <Button onClick={onRun} disabled={isRunning || !datasetName}>
-                    {isRunning ? "Running analysis..." : "Run Analysis"}
+                    {isRunning
+                        ? "Generating visualizations..."
+                        : "Generate Visualizations"}
                 </Button>
-                <Button
-                    variant="outline"
-                    onClick={onExport}
-                    disabled={!hasResult}
-                >
-                    Export Report
-                </Button>
-                {exportMessage && (
-                    <p
-                        className={
-                            exportStatus === "error"
-                                ? "text-destructive text-xs"
-                                : "text-muted-foreground text-xs"
-                        }
-                    >
-                        {exportMessage}
-                    </p>
-                )}
             </section>
 
             <section className="mt-auto">
@@ -146,15 +122,10 @@ const AnalysisSidebar = ({
                             {new Date(generatedAt).toLocaleString()}
                         </div>
                     )}
-                    {durationMs !== null && (
-                        <div className="text-muted-foreground text-xs font-normal">
-                            Runtime {formatDuration(durationMs)}
-                        </div>
-                    )}
                 </div>
             </section>
         </div>
     );
 };
 
-export default AnalysisSidebar;
+export default VisualizationsSidebar;

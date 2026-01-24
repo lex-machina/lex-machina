@@ -743,6 +743,49 @@ export interface AnalysisUIState {
     selected_column: string | null;
 }
 
+export interface VisualizationsUIState {
+    use_processed_data: boolean;
+    chart_overrides: Record<string, VisualizationChartKind>;
+}
+
+export type VisualizationChartKind =
+    | "histogram"
+    | "bar"
+    | "time"
+    | "line"
+    | "column"
+    | "pie";
+
+export interface VisualizationPieSlice {
+    label: string;
+    value: number;
+    percentage: number;
+    start_angle: number;
+    end_angle: number;
+    color_index: number;
+}
+
+export interface VisualizationChart {
+    title: string;
+    column: string;
+    inferred_type: string;
+    unique_count: number;
+    null_percentage: number;
+    kind: VisualizationChartKind;
+    available_kinds: VisualizationChartKind[];
+    histogram?: HistogramBin[] | null;
+    categories?: CategoryCount[] | null;
+    time_bins?: TimeBin[] | null;
+    box_plot?: BoxPlotSummary | null;
+    pie_slices?: VisualizationPieSlice[] | null;
+}
+
+export interface VisualizationDashboard {
+    dataset: AnalysisDataset;
+    generated_at: string;
+    charts: VisualizationChart[];
+}
+
 export interface AnalysisSummary {
     rows: number;
     columns: number;
@@ -752,6 +795,21 @@ export interface AnalysisSummary {
     total_missing_cells: number;
     total_missing_percentage: number;
     type_distribution: TypeDistributionEntry[];
+}
+
+export interface AnalysisSummaryView {
+    rows: string;
+    columns: string;
+    memory: string;
+    duplicates: string;
+    missing_cells: string;
+    type_distribution: TypeDistributionEntryView[];
+}
+
+export interface TypeDistributionEntryView {
+    dtype: string;
+    count: string;
+    percentage: string;
 }
 
 export interface TypeDistributionEntry {
@@ -859,6 +917,47 @@ export interface HeatmapMatrix {
     p_values?: number[][] | null;
 }
 
+export interface HeatmapMatrixView {
+    x_labels: string[];
+    y_labels: string[];
+    values: number[][];
+    p_values?: number[][] | null;
+    min: number;
+    max: number;
+    center?: number | null;
+    truncated: boolean;
+    total_columns: number;
+}
+
+export type AnalysisHeatmapKind =
+    | "pearson"
+    | "spearman"
+    | "cramers_v"
+    | "chi_square"
+    | "missingness";
+
+export interface AnalysisColumnListItem {
+    name: string;
+    dtype: string;
+    inferred_type: string;
+    inferred_role: string;
+    unique_count: number;
+    null_percentage: number;
+}
+
+export interface AnalysisColumnFilter {
+    search?: string | null;
+    inferred_types: string[];
+    sort_by: "name" | "nulls" | "cardinality" | "type";
+    sort_direction: "asc" | "desc";
+}
+
+export interface AnalysisColumnListResponse {
+    total: number;
+    filtered: number;
+    columns: AnalysisColumnListItem[];
+}
+
 export interface MissingnessAnalysis {
     total_missing_cells: number;
     total_missing_percentage: number;
@@ -903,6 +1002,7 @@ export interface AnalysisResult {
     generated_at: string;
     duration_ms: number;
     summary: AnalysisSummary;
+    summary_view: AnalysisSummaryView;
     dataset_profile: DatasetProfile;
     columns: AnalysisColumnStats[];
     missingness: MissingnessAnalysis;

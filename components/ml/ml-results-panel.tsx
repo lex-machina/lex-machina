@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
     Brain,
@@ -204,6 +204,10 @@ function ModelComparisonTable({ models }: { models: ModelComparison[] }) {
 /* eslint-disable @next/next/no-img-element, jsx-a11y/alt-text */
 function ShapViewer({ shapPlots }: { shapPlots: Record<string, string> }) {
     const entries = Object.entries(shapPlots ?? {});
+    const [activePlot, setActivePlot] = useState<{
+        title: string;
+        data: string;
+    } | null>(null);
 
     if (entries.length === 0) {
         return (
@@ -213,26 +217,139 @@ function ShapViewer({ shapPlots }: { shapPlots: Record<string, string> }) {
         );
     }
 
+    const globalPlots = buildPlotGroup(entries, [
+        ["summary", "Summary (global impact)"],
+        ["beeswarm", "Beeswarm (feature effects)"],
+        ["feature_importance", "Feature importance"],
+    ]);
+    const localPlots = buildPlotGroup(entries, [
+        ["waterfall", "Waterfall (single prediction)"],
+        ["decision", "Decision (model path)"],
+    ]);
+    const dependencePlots = entries
+        .filter(([name]) => name.startsWith("dependence:"))
+        .map(([name, data]) => ({
+            name,
+            label: `Dependence: ${name.replace("dependence:", "")}`,
+            data,
+        }));
+
     return (
-        <div className="flex flex-col gap-3">
-            {entries.map(([name, data]) => (
-                <div
-                    key={name}
-                    className="border-border bg-muted/20 flex flex-col gap-2 rounded-md border p-2"
-                >
-                    <span className="text-muted-foreground text-xs uppercase">
-                        {name}
-                    </span>
-                    <div className="bg-background flex items-center justify-center rounded-md border p-2">
-                        <img
-                            src={`data:image/png;base64,${data}`}
-                            alt=""
-                            loading="lazy"
-                            className="h-auto w-full object-contain"
-                        />
+        <div className="flex flex-col gap-4">
+            {globalPlots.length > 0 && (
+                <PlotSection
+                    title="Global explanations"
+                    plots={globalPlots}
+                    onSelect={setActivePlot}
+                />
+            )}
+            {localPlots.length > 0 && (
+                <PlotSection
+                    title="Local explanations"
+                    plots={localPlots}
+                    onSelect={setActivePlot}
+                />
+            )}
+            {dependencePlots.length > 0 && (
+                <PlotSection
+                    title="Feature dependence"
+                    plots={dependencePlots}
+                    onSelect={setActivePlot}
+                />
+            )}
+            {activePlot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+                    <button
+                        type="button"
+                        className="absolute inset-0"
+                        onClick={() => setActivePlot(null)}
+                    />
+                    <div className="bg-background border-border relative w-full max-w-5xl rounded-lg border p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                            <span className="text-sm font-semibold">
+                                {activePlot.title}
+                            </span>
+                            <button
+                                type="button"
+                                className="text-muted-foreground hover:text-foreground text-xs"
+                                onClick={() => setActivePlot(null)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className="max-h-[80vh] overflow-auto">
+                            <img
+                                src={`data:image/png;base64,${activePlot.data}`}
+                                alt=""
+                                className="h-auto w-full object-contain"
+                            />
+                        </div>
                     </div>
                 </div>
-            ))}
+            )}
+        </div>
+    );
+}
+
+function buildPlotGroup(
+    entries: [string, string][],
+    configs: Array<[string, string]>,
+) {
+    return configs
+        .map(([name, label]) => {
+            const match = entries.find(([key]) => key === name);
+            if (!match) {
+                return null;
+            }
+            return {
+                name,
+                label,
+                data: match[1],
+            };
+        })
+        .filter((plot): plot is { name: string; label: string; data: string } =>
+            Boolean(plot),
+        );
+}
+
+function PlotSection({
+    title,
+    plots,
+    onSelect,
+}: {
+    title: string;
+    plots: { name: string; label: string; data: string }[];
+    onSelect: (plot: { title: string; data: string }) => void;
+}) {
+    return (
+        <div>
+            <div className="text-muted-foreground mb-2 text-xs uppercase">
+                {title}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+                {plots.map((plot) => (
+                    <button
+                        key={plot.name}
+                        type="button"
+                        className="border-border bg-muted/20 hover:border-muted-foreground/40 flex flex-col gap-2 rounded-md border p-2 text-left transition"
+                        onClick={() =>
+                            onSelect({ title: plot.label, data: plot.data })
+                        }
+                    >
+                        <span className="text-muted-foreground text-xs">
+                            {plot.label}
+                        </span>
+                        <div className="bg-background flex items-center justify-center rounded-md border p-2">
+                            <img
+                                src={`data:image/png;base64,${plot.data}`}
+                                alt=""
+                                loading="lazy"
+                                className="h-auto w-full object-contain"
+                            />
+                        </div>
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }

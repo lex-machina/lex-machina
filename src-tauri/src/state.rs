@@ -55,6 +55,8 @@
 //! - `preprocessing_history` - Transient processing history
 //! - `processed_dataframe` - Can be regenerated from source
 
+use std::collections::HashMap;
+
 use lex_learning::{CancellationToken as MLCancellationToken, TrainingResult};
 use lex_processing::{
     CancellationToken, ColumnProfile, DataQualityIssue, DatasetProfile, PipelineConfig,
@@ -146,6 +148,15 @@ pub struct LoadedDataFrame {
     /// Cached File metadata.
     /// Computed once when loading, served from cache thereafter.
     pub file_info: FileInfo,
+}
+
+/// Cached batch prediction output.
+///
+/// Stores the source CSV path and prediction output for export.
+pub struct BatchPredictionCache {
+    pub df: polars::prelude::DataFrame,
+    pub source_path: String,
+    pub generated_at: String,
 }
 
 // ============================================================================
@@ -567,6 +578,28 @@ impl Default for AnalysisUIState {
     }
 }
 
+/// UI state for the visualizations page.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::VisualizationsUIState`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualizationsUIState {
+    /// Whether to use processed data for visualizations
+    pub use_processed_data: bool,
+    /// Chart type overrides keyed by column name
+    pub chart_overrides: HashMap<String, VisualizationChartKind>,
+}
+
+impl Default for VisualizationsUIState {
+    fn default() -> Self {
+        Self {
+            use_processed_data: false,
+            chart_overrides: HashMap::new(),
+        }
+    }
+}
+
 /// High-level summary of the dataset analysis.
 ///
 /// # Mirrors
@@ -582,6 +615,25 @@ pub struct AnalysisSummary {
     pub total_missing_cells: usize,
     pub total_missing_percentage: f64,
     pub type_distribution: Vec<TypeDistributionEntry>,
+}
+
+/// Pre-formatted summary values for UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisSummaryView {
+    pub rows: String,
+    pub columns: String,
+    pub memory: String,
+    pub duplicates: String,
+    pub missing_cells: String,
+    pub type_distribution: Vec<TypeDistributionEntryView>,
+}
+
+/// Pre-formatted type distribution entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeDistributionEntryView {
+    pub dtype: String,
+    pub count: String,
+    pub percentage: String,
 }
 
 /// Type distribution entry for dataset summary.
@@ -724,6 +776,48 @@ pub struct HeatmapMatrix {
     pub p_values: Option<Vec<Vec<f64>>>,
 }
 
+/// Heatmap matrix view for UI (supports truncation and scaling).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeatmapMatrixView {
+    pub x_labels: Vec<String>,
+    pub y_labels: Vec<String>,
+    pub values: Vec<Vec<f64>>,
+    pub p_values: Option<Vec<Vec<f64>>>,
+    pub min: f64,
+    pub max: f64,
+    pub center: Option<f64>,
+    pub truncated: bool,
+    pub total_columns: usize,
+}
+
+/// Column list item for the analysis columns panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisColumnListItem {
+    pub name: String,
+    pub dtype: String,
+    pub inferred_type: String,
+    pub inferred_role: String,
+    pub unique_count: usize,
+    pub null_percentage: f64,
+}
+
+/// Filter options for the analysis columns panel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisColumnFilter {
+    pub search: Option<String>,
+    pub inferred_types: Vec<String>,
+    pub sort_by: String,
+    pub sort_direction: String,
+}
+
+/// Column list response for analysis view.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisColumnListResponse {
+    pub total: usize,
+    pub filtered: usize,
+    pub columns: Vec<AnalysisColumnListItem>,
+}
+
 /// Correlation analysis results for numeric columns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorrelationAnalysis {
@@ -771,6 +865,7 @@ pub struct AnalysisResult {
     pub generated_at: String,
     pub duration_ms: u64,
     pub summary: AnalysisSummary,
+    pub summary_view: AnalysisSummaryView,
     pub dataset_profile: DatasetProfile,
     pub columns: Vec<AnalysisColumnStats>,
     pub missingness: MissingnessAnalysis,
@@ -784,6 +879,77 @@ pub struct AnalysisResult {
 pub struct AnalysisCache {
     pub original: Option<AnalysisResult>,
     pub processed: Option<AnalysisResult>,
+}
+
+/// Visualization chart kind.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::VisualizationChartKind`
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualizationChartKind {
+    Histogram,
+    Bar,
+    Time,
+    Line,
+    Column,
+    Pie,
+}
+
+/// Pie chart slice data for categorical charts.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::VisualizationPieSlice`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualizationPieSlice {
+    pub label: String,
+    pub value: usize,
+    pub percentage: f64,
+    pub start_angle: f64,
+    pub end_angle: f64,
+    pub color_index: usize,
+}
+
+/// Visualization chart payload.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::VisualizationChart`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualizationChart {
+    pub title: String,
+    pub column: String,
+    pub inferred_type: String,
+    pub unique_count: usize,
+    pub null_percentage: f64,
+    pub kind: VisualizationChartKind,
+    pub available_kinds: Vec<VisualizationChartKind>,
+    pub histogram: Option<Vec<HistogramBin>>,
+    pub categories: Option<Vec<CategoryCount>>,
+    pub time_bins: Option<Vec<TimeBin>>,
+    pub box_plot: Option<BoxPlotSummary>,
+    pub pie_slices: Option<Vec<VisualizationPieSlice>>,
+}
+
+/// Visualization dashboard payload.
+///
+/// # Mirrors
+///
+/// TypeScript: `types/index.ts::VisualizationDashboard`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualizationDashboard {
+    pub dataset: AnalysisDataset,
+    pub generated_at: String,
+    pub charts: Vec<VisualizationChart>,
+}
+
+/// Cached visualization dashboards for original and processed datasets.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VisualizationCache {
+    pub original: Option<VisualizationDashboard>,
+    pub processed: Option<VisualizationDashboard>,
 }
 
 /// A snapshot of ML configuration for history entries.
@@ -951,6 +1117,15 @@ pub struct AppState {
     /// Session-only: not persisted to disk.
     pub analysis_ui_state: RwLock<AnalysisUIState>,
 
+    /// Cached visualization dashboards for original and processed datasets.
+    /// Session-only: not persisted to disk.
+    pub visualizations_results: RwLock<VisualizationCache>,
+
+    /// UI state for the visualizations page.
+    /// Persists dataset toggle across navigation.
+    /// Session-only: not persisted to disk.
+    pub visualizations_ui_state: RwLock<VisualizationsUIState>,
+
     // ============================================================================
     // ML STATE FIELDS
     // ============================================================================
@@ -979,6 +1154,9 @@ pub struct AppState {
     /// Set to true after successful runtime initialization.
     pub ml_runtime_initialized: RwLock<bool>,
 
+    /// Most recent batch prediction output for export.
+    pub ml_batch_prediction: RwLock<Option<BatchPredictionCache>>,
+
     /// UI state for the ML page.
     /// Persists target column, config, and settings across navigation.
     /// Session-only: not persisted to disk.
@@ -1001,12 +1179,15 @@ impl AppState {
             preprocessing_ui_state: RwLock::new(PreprocessingUIState::default()),
             analysis_results: RwLock::new(AnalysisCache::default()),
             analysis_ui_state: RwLock::new(AnalysisUIState::default()),
+            visualizations_results: RwLock::new(VisualizationCache::default()),
+            visualizations_ui_state: RwLock::new(VisualizationsUIState::default()),
             trained_model: RwLock::new(None),
             training_result: RwLock::new(None),
             training_history: RwLock::new(Vec::new()),
             ml_training_in_progress: RwLock::new(false),
             ml_cancellation_token: RwLock::new(MLCancellationToken::new()),
             ml_runtime_initialized: RwLock::new(false),
+            ml_batch_prediction: RwLock::new(None),
             ml_ui_state: RwLock::new(MLUIState::default()),
         }
     }

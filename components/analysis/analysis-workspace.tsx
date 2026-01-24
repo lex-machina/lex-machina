@@ -14,6 +14,7 @@ import AnalysisQuality from "./analysis-quality";
 interface AnalysisWorkspaceProps {
     analysis: AnalysisResult;
     activeTab: string;
+    dataset: AnalysisResult["dataset"];
     onTabChange: (tab: string) => void;
     selectedColumn: string | null;
     onSelectColumn: (column: string) => void;
@@ -22,6 +23,7 @@ interface AnalysisWorkspaceProps {
 const AnalysisWorkspace = ({
     analysis,
     activeTab,
+    dataset,
     onTabChange,
     selectedColumn,
     onSelectColumn,
@@ -33,43 +35,68 @@ const AnalysisWorkspace = ({
 
     return (
         <Tabs value={activeTab} onValueChange={onTabChange} className="h-full">
-            <TabsList className="px-4">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="columns">Columns</TabsTrigger>
-                <TabsTrigger value="missingness">Missingness</TabsTrigger>
-                <TabsTrigger value="correlations">Correlations</TabsTrigger>
-                <TabsTrigger value="associations">Associations</TabsTrigger>
-                <TabsTrigger value="quality">Quality</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-6 gap-1 px-4">
+                <TabsTrigger value="overview" className="w-full">
+                    Overview
+                </TabsTrigger>
+                <TabsTrigger value="columns" className="w-full">
+                    Columns
+                </TabsTrigger>
+                <TabsTrigger value="missingness" className="w-full">
+                    Missingness
+                </TabsTrigger>
+                <TabsTrigger value="correlations" className="w-full">
+                    Correlations
+                </TabsTrigger>
+                <TabsTrigger value="associations" className="w-full">
+                    Associations
+                </TabsTrigger>
+                <TabsTrigger value="quality" className="w-full">
+                    Quality
+                </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="flex-1">
+            <TabsContent value="overview" className="h-full min-h-0 flex-1">
                 <AnalysisOverview analysis={analysis} />
             </TabsContent>
 
-            <TabsContent value="columns" className="flex-1">
-                <div className="grid h-full grid-cols-[280px_1fr] gap-3">
-                    <AnalysisColumns
-                        columns={analysis.columns}
-                        selectedColumn={activeColumn?.profile.name ?? null}
-                        onSelect={onSelectColumn}
-                    />
-                    <AnalysisColumnDetail column={activeColumn} />
+            <TabsContent value="columns" className="h-full min-h-0 flex-1">
+                <div className="flex h-full min-h-0 gap-3">
+                    <div className="h-full min-h-0 flex-[1_1_0%]">
+                        <AnalysisColumns
+                            useProcessedData={dataset === "processed"}
+                            selectedColumn={activeColumn?.profile.name ?? null}
+                            onSelect={onSelectColumn}
+                        />
+                    </div>
+                    <div className="h-full min-h-0 flex-[2_1_0%]">
+                        <AnalysisColumnDetail column={activeColumn} />
+                    </div>
                 </div>
             </TabsContent>
 
-            <TabsContent value="missingness" className="flex-1">
-                <AnalysisMissingness missingness={analysis.missingness} />
+            <TabsContent value="missingness" className="h-full min-h-0 flex-1">
+                <AnalysisMissingness
+                    dataset={dataset}
+                    missingness={analysis.missingness}
+                />
             </TabsContent>
 
-            <TabsContent value="correlations" className="flex-1">
-                <AnalysisCorrelations correlations={analysis.correlations} />
+            <TabsContent value="correlations" className="h-full min-h-0 flex-1">
+                <AnalysisCorrelations
+                    dataset={dataset}
+                    correlations={analysis.correlations}
+                />
             </TabsContent>
 
-            <TabsContent value="associations" className="flex-1">
-                <AnalysisAssociations associations={analysis.associations} />
+            <TabsContent value="associations" className="h-full min-h-0 flex-1">
+                <AnalysisAssociations
+                    dataset={dataset}
+                    associations={analysis.associations}
+                />
             </TabsContent>
 
-            <TabsContent value="quality" className="flex-1">
+            <TabsContent value="quality" className="h-full min-h-0 flex-1">
                 <AnalysisQuality issues={analysis.quality_issues} />
             </TabsContent>
         </Tabs>

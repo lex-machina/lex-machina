@@ -27,6 +27,7 @@ import {
     Table2,
     Cog,
     BarChart3,
+    LineChart,
     Brain,
     Settings,
     type LucideIcon,
@@ -52,7 +53,7 @@ const NAV_PADDING = 8 * 2;
 const NAV_SEPARATOR_WIDTH = 1 + 4;
 
 /** Number of main nav items */
-const MAIN_NAV_COUNT = 5;
+const MAIN_NAV_COUNT = 6;
 
 /** Number of bottom nav items (settings) */
 const BOTTOM_NAV_COUNT = 1;
@@ -108,7 +109,7 @@ interface SidebarNavProps {
 
 /**
  * Main navigation items.
- * Order: Home, Data, Processing, Analysis, ML
+ * Order: Home, Data, Processing, Analysis, Visualizations, ML
  */
 const MAIN_NAV_ITEMS: NavItem[] = [
     {
@@ -134,6 +135,12 @@ const MAIN_NAV_ITEMS: NavItem[] = [
         label: "Analysis",
         href: "/analysis",
         icon: BarChart3,
+    },
+    {
+        id: "visualizations",
+        label: "Visualizations",
+        href: "/visualizations",
+        icon: LineChart,
     },
     {
         id: "ml",

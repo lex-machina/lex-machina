@@ -14,6 +14,9 @@ from ..core import ExplainabilityResult
 from .plots import (
     calculate_feature_importance,
     generate_bar_plot,
+    generate_beeswarm_plot,
+    generate_decision_plot,
+    generate_dependence_plots,
     generate_summary_plot,
     generate_waterfall_plot,
     save_plots_to_disk,
@@ -74,16 +77,24 @@ def explain_model(
 
         # Generate plots
         summary_plot = generate_summary_plot(shap_values, X_sample, feature_names)
+        beeswarm_plot = generate_beeswarm_plot(shap_values, X_sample, feature_names)
         bar_plot = generate_bar_plot(shap_values, feature_names)
         waterfall_plot = generate_waterfall_plot(shap_values, X_sample, feature_names, base_value)
+        decision_plot = generate_decision_plot(shap_values, base_value, feature_names)
+        dependence_plots = generate_dependence_plots(
+            shap_values, X_sample, feature_names, max_features=2
+        )
 
         # Calculate feature importance
         feature_importance = calculate_feature_importance(shap_values, feature_names)
 
         return ExplainabilityResult(
             summary_plot=summary_plot,
-            beeswarm_plot=bar_plot,  # Using bar plot for compatibility
-            feature_importance_plot=waterfall_plot,
+            beeswarm_plot=beeswarm_plot,
+            feature_importance_plot=bar_plot,
+            waterfall_plot=waterfall_plot,
+            decision_plot=decision_plot,
+            dependence_plots=dependence_plots,
             feature_importance=feature_importance,
             method="shap",
         )

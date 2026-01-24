@@ -32,6 +32,17 @@ const AnalysisColumnDetail = ({ column }: AnalysisColumnDetailProps) => {
         <Card className="h-full">
             <CardHeader title={`Column: ${profile.name}`} />
             <CardContent className="flex h-full flex-col gap-4" padded>
+                <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
+                        {profile.inferred_type}
+                    </span>
+                    <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
+                        {profile.inferred_role}
+                    </span>
+                    <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
+                        {profile.null_percentage.toFixed(1)}% null
+                    </span>
+                </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                         <div className="text-muted-foreground">Type</div>
@@ -64,6 +75,51 @@ const AnalysisColumnDetail = ({ column }: AnalysisColumnDetailProps) => {
                     </div>
                 </div>
 
+                {profile.sample_values.length > 0 && (
+                    <section className="space-y-2">
+                        <h3 className="text-muted-foreground text-xs font-semibold uppercase">
+                            Sample Values
+                        </h3>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                            {profile.sample_values
+                                .slice(0, 12)
+                                .map((value, index) => (
+                                    <span
+                                        key={`${value}-${index}`}
+                                        className="bg-muted text-foreground rounded-md px-2 py-1"
+                                    >
+                                        {value}
+                                    </span>
+                                ))}
+                        </div>
+                    </section>
+                )}
+
+                {Object.keys(profile.characteristics).length > 0 && (
+                    <section className="space-y-2">
+                        <h3 className="text-muted-foreground text-xs font-semibold uppercase">
+                            Characteristics
+                        </h3>
+                        <div className="space-y-1 text-sm">
+                            {Object.entries(profile.characteristics).map(
+                                ([key, value]) => (
+                                    <div
+                                        key={key}
+                                        className="flex items-center justify-between"
+                                    >
+                                        <span className="text-muted-foreground">
+                                            {key}
+                                        </span>
+                                        <span className="font-medium">
+                                            {formatCharacteristicValue(value)}
+                                        </span>
+                                    </div>
+                                ),
+                            )}
+                        </div>
+                    </section>
+                )}
+
                 {column.numeric && <NumericDetail stats={column.numeric} />}
                 {column.categorical && (
                     <CategoricalDetail stats={column.categorical} />
@@ -88,6 +144,7 @@ const NumericDetail = ({
         start: bin.start,
         end: bin.end,
         count: bin.count,
+        range: formatRange(bin.start, bin.end),
     }));
 
     const histogramOptions: Plot.PlotOptions = {
@@ -102,6 +159,13 @@ const NumericDetail = ({
                 x2: "end",
                 y: "count",
                 fill: "count",
+                channels: { range: "range", count: "count" },
+                tip: {
+                    format: {
+                        range: (value) => value,
+                        count: (value) => formatCount(value),
+                    },
+                },
             }),
         ],
     };
@@ -113,25 +177,25 @@ const NumericDetail = ({
         y: { label: null },
         marks: [
             Plot.ruleX([stats.min, stats.max], { y: 0, stroke: "#9ca3af" }),
-            Plot.rectX(
+            Plot.rect(
                 [
                     {
                         x1: stats.box_plot.q1,
                         x2: stats.box_plot.q3,
-                        y: 0,
+                        y1: -0.35,
+                        y2: 0.35,
                     },
                 ],
                 {
                     x1: "x1",
                     x2: "x2",
-                    y: "y",
-                    height: 24,
+                    y1: "y1",
+                    y2: "y2",
                     fill: "#cbd5e1",
                     stroke: "#94a3b8",
                 },
             ),
             Plot.ruleX([stats.box_plot.median], {
-                y: 0,
                 stroke: "#475569",
                 strokeWidth: 2,
             }),
@@ -144,6 +208,8 @@ const NumericDetail = ({
                 Numeric Distribution
             </h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
+                <Metric label="Min" value={stats.min.toFixed(4)} />
+                <Metric label="Max" value={stats.max.toFixed(4)} />
                 <Metric label="Mean" value={stats.mean.toFixed(4)} />
                 <Metric label="Median" value={stats.median.toFixed(4)} />
                 <Metric label="Std Dev" value={stats.std_dev.toFixed(4)} />
@@ -195,6 +261,7 @@ const CategoricalDetail = ({
     const barData = stats.top_values.map((value) => ({
         label: value.value,
         count: value.count,
+        percentage: value.percentage,
     }));
 
     const barOptions: Plot.PlotOptions = {
@@ -203,7 +270,19 @@ const CategoricalDetail = ({
         x: { label: null },
         y: { label: null },
         marks: [
-            Plot.barX(barData, { x: "count", y: "label", fill: "#9ca3af" }),
+            Plot.barX(barData, {
+                x: "count",
+                y: "label",
+                fill: "#9ca3af",
+                channels: { percentage: "percentage" },
+                tip: {
+                    format: {
+                        label: (value) => value,
+                        count: (value) => formatCount(value),
+                        percentage: (value) => formatPercentValue(value, 1),
+                    },
+                },
+            }),
         ],
     };
 
@@ -232,17 +311,31 @@ const TextDetail = ({ stats }: { stats: AnalysisColumnStats["text"] }) => {
         return null;
     }
 
+    const lengthHistogramData = stats.length_histogram.map((bin) => ({
+        start: bin.start,
+        end: bin.end,
+        count: bin.count,
+        range: formatRange(bin.start, bin.end),
+    }));
+
     const histogramOptions: Plot.PlotOptions = {
         height: 140,
         marginLeft: 48,
         x: { label: null },
         y: { label: null, grid: true },
         marks: [
-            Plot.rectY(stats.length_histogram, {
+            Plot.rectY(lengthHistogramData, {
                 x1: "start",
                 x2: "end",
                 y: "count",
                 fill: "#9ca3af",
+                channels: { range: "range", count: "count" },
+                tip: {
+                    format: {
+                        range: (value) => value,
+                        count: (value) => formatCount(value),
+                    },
+                },
             }),
         ],
     };
@@ -300,6 +393,12 @@ const DatetimeDetail = ({
                 x: "label",
                 y: "count",
                 fill: "#94a3b8",
+                tip: {
+                    format: {
+                        label: (value) => value,
+                        count: (value) => formatCount(value),
+                    },
+                },
             }),
         ],
     };
@@ -351,5 +450,37 @@ const CategoryTable = ({ entries }: { entries: CategoryCount[] }) => (
         ))}
     </div>
 );
+
+const formatCharacteristicValue = (value: unknown) => {
+    if (value === null || value === undefined) {
+        return "—";
+    }
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number") {
+        return value.toFixed(3);
+    }
+    if (typeof value === "boolean") {
+        return value ? "true" : "false";
+    }
+    return JSON.stringify(value);
+};
+
+const formatCount = (value: unknown) =>
+    typeof value === "number" ? formatNumber(value) : "—";
+
+const formatPercentValue = (value: unknown, decimals = 1) =>
+    typeof value === "number" ? `${value.toFixed(decimals)}%` : "—";
+
+const formatNumericValue = (value: number) => {
+    if (!Number.isFinite(value)) {
+        return "—";
+    }
+    return Number.isInteger(value) ? formatNumber(value) : value.toFixed(2);
+};
+
+const formatRange = (start: number, end: number) =>
+    `${formatNumericValue(start)} - ${formatNumericValue(end)}`;
 
 export default AnalysisColumnDetail;
